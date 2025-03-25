@@ -1,0 +1,11 @@
+# Core dependencies
+PyQt5>=5.15
+matplotlib>=3.0
+
+# Platform-specific dependencies (optional but recommended)
+pywin32; sys_platform == 'win32'  # For Windows DPI handling
+
+# Development extras (if needed)
+# numpy>=1.0  # (likely needed by matplotlib/signal processing)
+# scipy>=1.0  # (likely needed for signal processing)
+# sounddevice>=0.4  # (likely needed for audio recording/playback)
