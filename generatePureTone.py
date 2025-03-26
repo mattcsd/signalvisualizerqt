@@ -34,6 +34,7 @@ class PureTone(QDialog):
         
         self.setupUI()
         self.plotPureTone()
+        self.setupAudioInteractions()  # Add this line
 
     def setupUI(self):
         self.setWindowTitle('Generate Pure Tone')
@@ -59,6 +60,37 @@ class PureTone(QDialog):
         main_layout.addLayout(self.create_controls())
         
         self.setLayout(main_layout)
+
+    '''* Audio playing functions *'''
+
+    def setupAudioInteractions(self):
+        """Setup click-to-play and region selection functionality"""
+        # Click-to-play full tone
+        # self.canvas.mpl_connect('button_press_event', self.on_click_play)
+        
+        # Region selection
+        self.span = SpanSelector(
+            self.ax,
+            self.on_select_region,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+
+    def on_select_region(self, xmin, xmax):
+        """Play selected region of the tone"""
+        fs = self.default_values['fs']
+        time = np.linspace(0, self.sliders['Duration (s)'].value()/100, 
+                          len(self.selectedAudio), endpoint=False)
+        
+        # Find indices for selected region
+        idx_min = np.argmax(time >= xmin)
+        idx_max = np.argmax(time >= xmax)
+        
+        # Play the selected portion
+        sd.stop()
+        sd.play(self.selectedAudio[idx_min:idx_max], fs)
 
     def create_controls(self):
         layout = QGridLayout()
@@ -117,15 +149,14 @@ class PureTone(QDialog):
         offset = self.sliders['Offset'].value() / 100
         fs = self.default_values['fs']
         
-        # Generate signal
+        # Generate and store signal
         samples = int(duration * fs)
         time = np.linspace(0, duration, samples, endpoint=False)
-        signal = amplitude * np.cos(2*np.pi*frequency*time + phase*np.pi) + offset
-        self.selectedAudio = signal  # Store the generated audio
+        self.selectedAudio = amplitude * np.cos(2*np.pi*frequency*time + phase*np.pi) + offset
         
         # Plot
-        self.ax.plot(time, signal, linewidth=1.5, color='blue')
-        
+        self.ax.plot(time, self.selectedAudio, linewidth=1.5, color='blue')
+
         # Set axes limits
         y_margin = max(0.1, amplitude * 0.2)
         self.ax.set_ylim(-amplitude-y_margin, amplitude+y_margin)
