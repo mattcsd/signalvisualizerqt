@@ -1,26 +1,32 @@
-from PyQt5.QtWidgets import QDesktopWidget
-
+# Add this to your auxiliar.py file
 class Auxiliar:
-    def windowGeometry(self, window, width, height, center=False):
-        """
-        Set the geometry of the window.
-        :param window: The window to set the geometry for.
-        :param width: The width of the window.
-        :param height: The height of the window.
-        :param center: If True, center the window on the screen.
-        """
-        if center:
-            # Get the screen dimensions
-            screen = QDesktopWidget().screenGeometry()
-            screen_width = screen.width()
-            screen_height = screen.height()
-
-            # Calculate the x and y coordinates to center the window
-            x = (screen_width - width) // 2
-            y = (screen_height - height) // 2
-
-            # Set the window geometry
-            window.setGeometry(x, y, width, height)
-        else:
-            # Set the window size without centering
-            window.resize(width, height)
+    def readFromCsv(self):
+        # This is a simplified version - you should replace with your actual CSV reading logic
+        return [
+            ['NOISE', '\t duration', 1.0, '\t amplitude', 0.5, '\t fs', 44100, '\t noise type', 'white'],
+            ['PURE TONE', '\t duration', 1.0, '\t amplitude', 0.5, '\t fs', 44100, 
+             '\t offset', 0.0, '\t frequency', 440, '\t phase', 0.0],
+            # Add other default values as needed
+        ]
+    
+    def saveDefaultAsCsv(self, data):
+        # Placeholder for your CSV saving logic
+        pass
+    
+    def bigFrequency(self, frequency, fs):
+        # Check if frequency is valid
+        if frequency > fs/2:
+            QMessageBox.warning(None, "Warning", 
+                              f"Frequency {frequency}Hz is greater than Nyquist frequency ({fs/2}Hz)")
+    
+    def onValidate(self, text, prior_text, action):
+        # Basic validation - allow numbers and decimal point
+        if text in '0123456789.':
+            return True
+        return False
+    
+    def onValidateInt(self, text):
+        # Basic integer validation
+        if text in '0123456789':
+            return True
+        return False

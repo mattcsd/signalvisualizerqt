@@ -1,58 +1,39 @@
-import tkinter as tk
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 import unicodedata
-from tkinter import ttk
+from PyQt5.QtWidgets import (QApplication, QDialog, QLabel, QLineEdit, QPushButton, 
+                            QRadioButton, QCheckBox, QComboBox, QGridLayout, 
+                            QSlider, QMessageBox, QVBoxLayout, QHBoxLayout)
+from PyQt5.QtCore import Qt, pyqtSignal
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.widgets import SpanSelector, Button, RadioButtons
 
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 
-import sys
-
-if sys.platform == "win32":
-    from ctypes import windll
-
-    # To avoid blurry fonts
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-else:
-    windll = None  # Or handle it differently for macOS
-    
-class PureTone(tk.Frame):
-    def __init__(self, master, controller):
-        tk.Frame.__init__(self, master)
+class PureTone(QDialog):
+    def __init__(self, controller, parent=None):
+        super().__init__(parent)
         self.controller = controller
-        self.master = master
         self.aux = Auxiliar()
         self.cm = ControlMenu()
-        self.fig, self.ax = plt.subplots()
         self.selectedAudio = np.empty(1)
-        self.toneMenu()
-
-    def toneMenu(self):
-        tm = tk.Toplevel()
-        tm.resizable(True, True)
-        tm.title('Generate pure tone')
-        tm.iconbitmap('icons/icon.ico')
-        tm.lift() # Place the toplevel window at the top
-        # self.aux.windowGeometry(tm, 850, 475)
-
-        # Adapt the window to different sizes
-        for i in range(4):
-            tm.columnconfigure(i, weight=1)
-
-        for i in range(6):
-            tm.rowconfigure(i, weight=1)
-
-        # If the 'generate' menu is closed, close also the generated figure
-        def on_closing():
-            tm.destroy()
-            plt.close(self.fig)
-        tm.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # Read the default values of the atributes from a csv file
+        
+        # Create matplotlib figure
+        self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvas(self.fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        self.setupUI()
+        
+    def setupUI(self):
+        self.setWindowTitle('Generate pure tone')
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.resize(850, 475)
+        
+        # Read default values
         list = self.aux.readFromCsv()
         duration = list[1][2]
         amplitude = list[1][4]
@@ -60,201 +41,309 @@ class PureTone(tk.Frame):
         offset = list[1][8]
         frequency = list[1][10]
         phase = list[1][12]
-
-        # SCALES
-        tm.var_dura = tk.DoubleVar(value=duration)
-        tm.var_offs = tk.DoubleVar(value=offset)
-        tm.var_ampl = tk.DoubleVar(value=amplitude)
-        tm.var_freq = tk.IntVar(value=frequency)
-        tm.var_phas = tk.DoubleVar(value=phase)
-
-        def updateExpression(event):
-            sign = str(ent_offs.get()+' + '+str(ent_ampl.get())+' COS(2'+unicodedata.lookup("GREEK SMALL LETTER PI")+' '+str(ent_freq.get())+'t + '+str(ent_phas.get())+unicodedata.lookup("GREEK SMALL LETTER PI")+')')
-            lab_sign.configure(text=sign)
-
-        sca_dura = tk.Scale(tm, from_=0.01, to=30, variable=tm.var_dura, length=500, orient='horizontal', resolution=0.01)
-        sca_offs = tk.Scale(tm, from_=-1, to=1, variable=tm.var_offs, length=500, orient='horizontal', tickinterval=1, command=updateExpression, resolution=0.01)
-        sca_ampl = tk.Scale(tm, from_=0, to=1, variable=tm.var_ampl, length=500, orient='horizontal', tickinterval=0.1, command=updateExpression, resolution=0.01)
-        sca_freq = tk.Scale(tm, from_=0, to=48000/2, variable=tm.var_freq, length=500, orient='horizontal', tickinterval=10000, command=updateExpression)
-        sca_phas = tk.Scale(tm, from_=-1, to=1, variable=tm.var_phas, length=500, orient='horizontal', tickinterval=1, command=updateExpression, resolution=0.01)
         
-        sca_dura.grid(column=1, row=0, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-        sca_offs.grid(column=1, row=1, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-        sca_ampl.grid(column=1, row=2, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-        sca_freq.grid(column=1, row=3, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-        sca_phas.grid(column=1, row=4, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-
-        # ENTRYS
-        tm.var_fs = tk.IntVar(value=self.fs)
-        vcmd = (tm.register(self.aux.onValidate), '%S', '%s', '%d')
-        vcfs = (tm.register(self.aux.onValidateInt), '%S')
-
-        ent_dura = ttk.Entry(tm, textvariable=tm.var_dura, validate='key', validatecommand=vcmd, width=10)
-        ent_offs = ttk.Entry(tm, textvariable=tm.var_offs, validate='key', validatecommand=vcmd, width=10)
-        ent_ampl = ttk.Entry(tm, textvariable=tm.var_ampl, validate='key', validatecommand=vcmd, width=10)
-        ent_freq = ttk.Entry(tm, textvariable=tm.var_freq, validate='key', validatecommand=vcmd, width=10)
-        ent_phas = ttk.Entry(tm, textvariable=tm.var_phas, validate='key', validatecommand=vcmd, width=10)
-        ent_fs = ttk.Entry(tm, textvariable=tm.var_fs, validate='key', validatecommand=vcfs, width=10)
-
-        def fsEntry(event):
-            fs = int(ent_fs.get())
-            if fs > 48000:
-                tm.var_fs.set('48000')
-                text = 'The sample frequency cannot be greater than 48000 Hz.'
-                tk.messagebox.showerror(parent=tm, title='Wrong sample frequency value', message=text)
-            else: return True
-
-        ent_offs.bind('<Return>', updateExpression)
-        ent_ampl.bind('<Return>', updateExpression)
-        ent_freq.bind('<Return>', updateExpression)
-        ent_phas.bind('<Return>', updateExpression)
-        ent_fs.bind('<Return>', fsEntry)
-
-        ent_dura.grid(column=4, row=0, padx=5, pady=5, sticky=tk.S)
-        ent_offs.grid(column=4, row=1, padx=5, pady=5)
-        ent_ampl.grid(column=4, row=2, padx=5, pady=5)
-        ent_freq.grid(column=4, row=3, padx=5, pady=5)
-        ent_phas.grid(column=4, row=4, padx=5, pady=5)
-        ent_fs.grid(column=4, row=5, padx=5, pady=5)
-
-        # LABELS
-        sign = str(ent_offs.get()+' + '+str(ent_ampl.get())+' COS(2'+unicodedata.lookup("GREEK SMALL LETTER PI")+' '+str(ent_freq.get())+'t + '+str(ent_phas.get())+unicodedata.lookup("GREEK SMALL LETTER PI")+')')
-        lab_dura = ttk.Label(tm, text='Total duration (s)')
-        lab_offs = ttk.Label(tm, text='Offset')
-        lab_ampl = ttk.Label(tm, text='Amplitude')
-        lab_freq = ttk.Label(tm, text='Frequency (Hz)')
-        lab_phas = ttk.Label(tm, text='Phase ('+ unicodedata.lookup("GREEK SMALL LETTER PI") +' rad)')
-        lab_expr = ttk.Label(tm, text='Expression')
-        lab_sign = ttk.Label(tm, text=sign, font=('TkDefaultFont', 12))
-        lab_fs = ttk.Label(tm, text='Fs (Hz)')
-
-        lab_dura.grid(column=0, row=0, sticky=tk.SE, pady=5)
-        lab_offs.grid(column=0, row=1, sticky=tk.E)
-        lab_ampl.grid(column=0, row=2, sticky=tk.E)
-        lab_freq.grid(column=0, row=3, sticky=tk.E)
-        lab_phas.grid(column=0, row=4, sticky=tk.E)
-        lab_expr.grid(column=0, row=5, sticky=tk.E, rowspan=2)
-        lab_sign.grid(column=1, row=5, rowspan=2, columnspan=3)
-        lab_fs.grid(column=3, row=5, sticky=tk.E)
+        # Main layout
+        main_layout = QVBoxLayout()
         
-        # BUTTONS
-        def checkValues(but):
-            self.fs = int(ent_fs.get()) # sample frequency
-            if fsEntry(self.fs) != True:
-                return
-            if but == 1: self.plotPureTone(tm, lab_sign, ent_ampl, ent_freq, ent_phas, ent_offs)
-            elif but == 2: self.saveDefaultValues(tm, list)
-
-        but_gene = ttk.Button(tm, command=lambda: checkValues(1), text='Plot')
-        but_save = ttk.Button(tm, command=lambda: checkValues(2), text='Save')
-        but_help = ttk.Button(tm, command=lambda: self.controller.help.createHelpMenu(1), text='🛈', width=2)
-
-        but_gene.grid(column=4, row=7, sticky=tk.EW, padx=5, pady=5)
-        but_save.grid(column=4, row=6, sticky=tk.EW, padx=5, pady=5)
-        but_help.grid(column=3, row=7, sticky=tk.E, padx=5, pady=5)
-
-        checkValues(1)
-
-    def saveDefaultValues(self, tm, list):
-        amplitude = tm.var_ampl.get()
-        frequency = tm.var_freq.get()
-        phase = tm.var_phas.get()
-        duration = tm.var_dura.get()
-        offset = tm.var_offs.get()
-
-        new_list = [['NOISE','\t duration', list[0][2],'\t amplitude', list[0][4],'\t fs', list[0][6],'\t noise type', list[0][8]],
-                ['PURE TONE','\t duration', duration,'\t amplitude', amplitude,'\t fs', self.fs,'\t offset', offset,'\t frequency', frequency,'\t phase',  phase],
-                ['SQUARE WAVE','\t duration', list[2][2],'\t amplitude', list[2][4],'\t fs', list[2][6],'\t offset', list[2][8],'\t frequency', list[2][10],'\t phase', list[2][12],'\t active cycle', list[2][14]],
-                ['SAWTOOTH WAVE','\t duration', list[3][2],'\t amplitude', list[3][4],'\t fs', list[3][6],'\t offset', list[3][8],'\t frequency', list[3][10],'\t phase', list[3][12],'\t max position', list[3][14]],
-                ['FREE ADD OF PT','\t duration', list[4][2],'\t octave', list[4][4],'\t freq1', list[4][6],'\t freq2', list[4][8],'\t freq3', list[4][10],'\t freq4', list[4][12],'\t freq5', list[4][14],'\t freq6', list[4][16],'\t amp1', list[4][18],'\t amp2', list[4][20],'\t amp3', list[4][22],'\t amp4', list[4][24],'\t amp5', list[4][26],'\t amp6', list[4][28]],
-                ['SPECTROGRAM','\t colormap', list[5][2]]]
+        # Matplotlib figure
+        fig_layout = QVBoxLayout()
+        fig_layout.addWidget(self.toolbar)
+        fig_layout.addWidget(self.canvas)
+        main_layout.addLayout(fig_layout)
+        
+        # Control layout
+        control_layout = QGridLayout()
+        control_layout.setSpacing(10)
+        
+        # Variables
+        self.var_dura = duration
+        self.var_offs = offset
+        self.var_ampl = amplitude
+        self.var_freq = frequency
+        self.var_phas = phase
+        self.var_fs = self.fs
+        
+        # Sliders
+        self.sca_dura = QSlider(Qt.Horizontal)
+        self.sca_dura.setRange(1, 3000)  # 0.01 to 30.00 in steps of 0.01
+        self.sca_dura.setValue(int(duration * 100))
+        self.sca_offs = QSlider(Qt.Horizontal)
+        self.sca_offs.setRange(-100, 100)  # -1.00 to 1.00 in steps of 0.01
+        self.sca_offs.setValue(int(offset * 100))
+        self.sca_ampl = QSlider(Qt.Horizontal)
+        self.sca_ampl.setRange(0, 100)  # 0.00 to 1.00 in steps of 0.01
+        self.sca_ampl.setValue(int(amplitude * 100))
+        self.sca_freq = QSlider(Qt.Horizontal)
+        self.sca_freq.setRange(0, 24000)  # 0 to 24000 Hz
+        self.sca_freq.setValue(frequency)
+        self.sca_phas = QSlider(Qt.Horizontal)
+        self.sca_phas.setRange(-100, 100)  # -1.00 to 1.00 in steps of 0.01
+        self.sca_phas.setValue(int(phase * 100))
+        
+        # Connect slider signals
+        self.sca_dura.valueChanged.connect(self.updateDuration)
+        self.sca_offs.valueChanged.connect(self.updateOffset)
+        self.sca_ampl.valueChanged.connect(self.updateAmplitude)
+        self.sca_freq.valueChanged.connect(self.updateFrequency)
+        self.sca_phas.valueChanged.connect(self.updatePhase)
+        
+        # Add sliders to layout
+        control_layout.addWidget(QLabel('Total duration (s)'), 0, 0)
+        control_layout.addWidget(self.sca_dura, 0, 1, 1, 3)
+        control_layout.addWidget(QLabel('Offset'), 1, 0)
+        control_layout.addWidget(self.sca_offs, 1, 1, 1, 3)
+        control_layout.addWidget(QLabel('Amplitude'), 2, 0)
+        control_layout.addWidget(self.sca_ampl, 2, 1, 1, 3)
+        control_layout.addWidget(QLabel('Frequency (Hz)'), 3, 0)
+        control_layout.addWidget(self.sca_freq, 3, 1, 1, 3)
+        control_layout.addWidget(QLabel(f'Phase (π rad)'), 4, 0)
+        control_layout.addWidget(self.sca_phas, 4, 1, 1, 3)
+        
+        # Entries
+        self.ent_dura = QLineEdit(f"{duration:.2f}")
+        self.ent_offs = QLineEdit(f"{offset:.2f}")
+        self.ent_ampl = QLineEdit(f"{amplitude:.2f}")
+        self.ent_freq = QLineEdit(str(frequency))
+        self.ent_phas = QLineEdit(f"{phase:.2f}")
+        self.ent_fs = QLineEdit(str(self.fs))
+        
+        # Connect entry signals
+        self.ent_dura.editingFinished.connect(self.entryDurationChanged)
+        self.ent_offs.editingFinished.connect(self.entryOffsetChanged)
+        self.ent_ampl.editingFinished.connect(self.entryAmplitudeChanged)
+        self.ent_freq.editingFinished.connect(self.entryFrequencyChanged)
+        self.ent_phas.editingFinished.connect(self.entryPhaseChanged)
+        self.ent_fs.editingFinished.connect(self.entryFsChanged)
+        
+        # Add entries to layout
+        control_layout.addWidget(self.ent_dura, 0, 4)
+        control_layout.addWidget(self.ent_offs, 1, 4)
+        control_layout.addWidget(self.ent_ampl, 2, 4)
+        control_layout.addWidget(self.ent_freq, 3, 4)
+        control_layout.addWidget(self.ent_phas, 4, 4)
+        
+        # Expression label
+        self.lab_sign = QLabel()
+        self.updateExpression()
+        control_layout.addWidget(QLabel('Expression'), 5, 0)
+        control_layout.addWidget(self.lab_sign, 5, 1, 1, 3)
+        control_layout.addWidget(QLabel('Fs (Hz)'), 5, 3)
+        control_layout.addWidget(self.ent_fs, 5, 4)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.but_save = QPushButton('Save')
+        self.but_save.clicked.connect(self.saveDefaultValues)
+        self.but_plot = QPushButton('Plot')
+        self.but_plot.clicked.connect(self.plotPureTone)
+        self.but_help = QPushButton('🛈')
+        self.but_help.setFixedWidth(30)
+        self.but_help.clicked.connect(lambda: self.controller.help.createHelpMenu(1))
+        
+        button_layout.addWidget(self.but_save)
+        button_layout.addWidget(self.but_plot)
+        button_layout.addWidget(self.but_help)
+        control_layout.addLayout(button_layout, 6, 1, 1, 4)
+        
+        main_layout.addLayout(control_layout)
+        self.setLayout(main_layout)
+        
+        # Initial plot
+        self.plotPureTone()
+    
+    def updateExpression(self):
+        pi_symbol = unicodedata.lookup("GREEK SMALL LETTER PI")
+        sign = f"{self.var_offs:.2f} + {self.var_ampl:.2f} COS(2{pi_symbol} {self.var_freq}t + {self.var_phas:.2f}{pi_symbol})"
+        self.lab_sign.setText(sign)
+    
+    # Slider update methods
+    def updateDuration(self, value):
+        self.var_dura = value / 100
+        self.ent_dura.setText(f"{self.var_dura:.2f}")
+        self.updateExpression()
+    
+    def updateOffset(self, value):
+        self.var_offs = value / 100
+        self.ent_offs.setText(f"{self.var_offs:.2f}")
+        self.updateExpression()
+    
+    def updateAmplitude(self, value):
+        self.var_ampl = value / 100
+        self.ent_ampl.setText(f"{self.var_ampl:.2f}")
+        self.updateExpression()
+    
+    def updateFrequency(self, value):
+        self.var_freq = value
+        self.ent_freq.setText(str(self.var_freq))
+        self.updateExpression()
+    
+    def updatePhase(self, value):
+        self.var_phas = value / 100
+        self.ent_phas.setText(f"{self.var_phas:.2f}")
+        self.updateExpression()
+    
+    # Entry update methods
+    def entryDurationChanged(self):
+        try:
+            value = float(self.ent_dura.text())
+            if 0.01 <= value <= 30:
+                self.var_dura = value
+                self.sca_dura.setValue(int(value * 100))
+            else:
+                self.ent_dura.setText(f"{self.var_dura:.2f}")
+        except ValueError:
+            self.ent_dura.setText(f"{self.var_dura:.2f}")
+    
+    def entryOffsetChanged(self):
+        try:
+            value = float(self.ent_offs.text())
+            if -1 <= value <= 1:
+                self.var_offs = value
+                self.sca_offs.setValue(int(value * 100))
+            else:
+                self.ent_offs.setText(f"{self.var_offs:.2f}")
+        except ValueError:
+            self.ent_offs.setText(f"{self.var_offs:.2f}")
+    
+    def entryAmplitudeChanged(self):
+        try:
+            value = float(self.ent_ampl.text())
+            if 0 <= value <= 1:
+                self.var_ampl = value
+                self.sca_ampl.setValue(int(value * 100))
+            else:
+                self.ent_ampl.setText(f"{self.var_ampl:.2f}")
+        except ValueError:
+            self.ent_ampl.setText(f"{self.var_ampl:.2f}")
+    
+    def entryFrequencyChanged(self):
+        try:
+            value = int(self.ent_freq.text())
+            if 0 <= value <= 24000:
+                self.var_freq = value
+                self.sca_freq.setValue(value)
+            else:
+                self.ent_freq.setText(str(self.var_freq))
+        except ValueError:
+            self.ent_freq.setText(str(self.var_freq))
+    
+    def entryPhaseChanged(self):
+        try:
+            value = float(self.ent_phas.text())
+            if -1 <= value <= 1:
+                self.var_phas = value
+                self.sca_phas.setValue(int(value * 100))
+            else:
+                self.ent_phas.setText(f"{self.var_phas:.2f}")
+        except ValueError:
+            self.ent_phas.setText(f"{self.var_phas:.2f}")
+    
+    def entryFsChanged(self):
+        try:
+            value = int(self.ent_fs.text())
+            if value > 48000:
+                self.ent_fs.setText(str(self.fs))
+                QMessageBox.critical(self, 'Wrong sample frequency value', 
+                                   'The sample frequency cannot be greater than 48000 Hz.')
+            else:
+                self.fs = value
+        except ValueError:
+            self.ent_fs.setText(str(self.fs))
+    
+    def saveDefaultValues(self):
+        list = self.aux.readFromCsv()
+        new_list = [
+            ['NOISE','\t duration', list[0][2],'\t amplitude', list[0][4],'\t fs', list[0][6],'\t noise type', list[0][8]],
+            ['PURE TONE','\t duration', self.var_dura,'\t amplitude', self.var_ampl,'\t fs', self.fs,
+             '\t offset', self.var_offs,'\t frequency', self.var_freq,'\t phase', self.var_phas],
+            ['SQUARE WAVE','\t duration', list[2][2],'\t amplitude', list[2][4],'\t fs', list[2][6],
+             '\t offset', list[2][8],'\t frequency', list[2][10],'\t phase', list[2][12],'\t active cycle', list[2][14]],
+            ['SAWTOOTH WAVE','\t duration', list[3][2],'\t amplitude', list[3][4],'\t fs', list[3][6],
+             '\t offset', list[3][8],'\t frequency', list[3][10],'\t phase', list[3][12],'\t max position', list[3][14]],
+            ['FREE ADD OF PT','\t duration', list[4][2],'\t octave', list[4][4],'\t freq1', list[4][6],
+             '\t freq2', list[4][8],'\t freq3', list[4][10],'\t freq4', list[4][12],'\t freq5', list[4][14],
+             '\t freq6', list[4][16],'\t amp1', list[4][18],'\t amp2', list[4][20],'\t amp3', list[4][22],
+             '\t amp4', list[4][24],'\t amp5', list[4][26],'\t amp6', list[4][28]],
+            ['SPECTROGRAM','\t colormap', list[5][2]]
+        ]
         self.aux.saveDefaultAsCsv(new_list)
-
-    def plotPureTone(self, tm, lab_sign, ent_ampl, ent_freq, ent_phas, ent_offs):
-        amplitude = tm.var_ampl.get()
-        frequency = tm.var_freq.get()
-        phase = tm.var_phas.get()
-        duration = tm.var_dura.get()
-        offset = tm.var_offs.get()
-        samples = int(duration*self.fs)
-
-        # Update expression
-        sign = str(ent_offs.get()+' + '+str(ent_ampl.get())+' COS(2'+unicodedata.lookup("GREEK SMALL LETTER PI")+' '+str(ent_freq.get())+'t + '+str(ent_phas.get())+unicodedata.lookup("GREEK SMALL LETTER PI")+')')
-        lab_sign.configure(text=sign)
-
-        # Check if the frequency is smaller than self.fs/2
-        self.aux.bigFrequency(frequency, self.fs)
-
-        time = np.linspace(start=0, stop=duration, num=samples, endpoint=False)
-        ptone = amplitude * (np.cos(2*np.pi * frequency*time + phase*np.pi)) + offset
-
-        # If the window has been closed, create it again
-        if plt.fignum_exists(self.fig.number):
-            self.ax.clear() # delete the previous plot
-        else:
-            self.fig, self.ax = plt.subplots() # create the window
-
-        fig, ax = self.fig, self.ax
-        self.addLoadButton(fig, ax, self.fs, time, ptone, duration, tm, 'Pure tone')
-        self.addScaleSaturateRadiobuttons(fig, offset)
-
+    
+    def plotPureTone(self):
+        # Check frequency
+        self.aux.bigFrequency(self.var_freq, self.fs)
+        
+        # Generate signal
+        samples = int(self.var_dura * self.fs)
+        time = np.linspace(start=0, stop=self.var_dura, num=samples, endpoint=False)
+        ptone = self.var_ampl * (np.cos(2*np.pi * self.var_freq*time + self.var_phas*np.pi)) + self.var_offs
+        
+        # Clear and redraw
+        self.ax.clear()
+        
         # Plot the pure tone
         limite = max(abs(ptone))*1.1
-        ax.plot(time, ptone)
-        fig.canvas.manager.set_window_title('Pure tone')
-        ax.set(xlim=[0, duration], ylim=[-limite, limite], xlabel='Time (s)', ylabel='Amplitude')
-        ax.axhline(y=0, color='black', linewidth='0.5', linestyle='--') # draw an horizontal line in y=0.0
-        ax.axhline(y=1.0, color='red', linewidth='0.8', linestyle='--') # draw an horizontal line in y=1.0
-        ax.axhline(y=-1.0, color='red', linewidth='0.8', linestyle='--') # draw an horizontal line in y=-1.0
-        ax.axhline(y=offset, color='blue', linewidth='1', label="offset") # draw an horizontal line in y=offset
-        ax.legend(loc="upper right")
-
-        plt.show()
-
-    def addLoadButton(self, fig, ax, fs, time, audio, duration, menu, name):
-        # Takes the selected fragment and opens the control menu when clicked
+        self.ax.plot(time, ptone)
+        self.fig.canvas.setWindowTitle('Pure tone')
+        self.ax.set(xlim=[0, self.var_dura], ylim=[-limite, limite], 
+                   xlabel='Time (s)', ylabel='Amplitude')
+        self.ax.axhline(y=0, color='black', linewidth=0.5, linestyle='--')
+        self.ax.axhline(y=1.0, color='red', linewidth=0.8, linestyle='--')
+        self.ax.axhline(y=-1.0, color='red', linewidth=0.8, linestyle='--')
+        self.ax.axhline(y=self.var_offs, color='blue', linewidth=1, label="offset")
+        self.ax.legend(loc="upper right")
+        
+        # Add load button
+        self.addLoadButton(self.fig, self.ax, self.fs, time, ptone, self.var_dura, 'Pure tone')
+        
+        # Add scale/saturate radio buttons if needed
+        if self.var_offs > 0.5 or self.var_offs < -0.5:
+            self.addScaleSaturateRadiobuttons(self.fig, self.var_offs)
+        
+        self.canvas.draw()
+    
+    def addLoadButton(self, fig, ax, fs, time, audio, duration, name):
+        axload = fig.add_axes([0.8, 0.01, 0.09, 0.05])
+        but_load = Button(axload, 'Load')
+        
         def load(event):
             if self.selectedAudio.shape == (1,): 
                 self.cm.createControlMenu(name, fs, audio, duration, self.controller)
             else:
-                time = np.arange(0, len(self.selectedAudio)/fs, 1/fs) # time array of the audio
-                durSelec = max(time) # duration of the selected fragment
+                time = np.arange(0, len(self.selectedAudio)/fs, 1/fs)
+                durSelec = max(time)
                 self.cm.createControlMenu(name, fs, self.selectedAudio, durSelec, self.controller)
             plt.close(fig)
-            menu.destroy()
-            axload._but_load = but_load # reference to the Button (otherwise the button does nothing)
-
-        # Adds a 'Load' button to the figure
-        axload = fig.add_axes([0.8, 0.01, 0.09, 0.05]) # [left, bottom, width, height]
-        but_load = Button(axload, 'Load')
+            self.close()
+        
         but_load.on_clicked(load)
-        axload._but_load = but_load # reference to the Button (otherwise the button does nothing)
-
+        axload._but_load = but_load
+        
         def listenFrag(xmin, xmax):
             ini, end = np.searchsorted(time, (xmin, xmax))
             self.selectedAudio = audio[ini:end+1]
             sd.play(self.selectedAudio, fs)
             
-        self.span = SpanSelector(ax, listenFrag, 'horizontal', useblit=True, interactive=True, drag_from_anywhere=True)
-
+        self.span = SpanSelector(ax, listenFrag, 'horizontal', useblit=True, 
+                               interactive=True, drag_from_anywhere=True)
+    
     def addScaleSaturateRadiobuttons(self, fig, offset):
-        if offset > 0.5 or offset < -0.5:
-            def exceed(label):
-                options = {'scale': 0, 'saturate': 1}
-                option = options[label]
-                if option == 0: # scale
-                    for i in range(len(self.selectedAudio)):
-                        if self.selectedAudio[i] > 1:
-                            self.selectedAudio[i] = 1
-                        elif self.selectedAudio[i] < -1:
-                            self.selectedAudio[i] = -1
-                elif option == 1: # saturate
-                    if max(self.selectedAudio) > 1:
-                        self.selectedAudio = self.selectedAudio/max(abs(self.selectedAudio))
-                    elif min(self.selectedAudio) < -1:
-                        self.selectedAudio = self.selectedAudio/min(abs(self.selectedAudio))
-                rax._radio = radio # reference to the Button (otherwise the button does nothing)
-
-            rax = fig.add_axes([0.75, 0.9, 0.15, 0.1]) # [left, bottom, width, height]
-            radio = RadioButtons(rax, ('scale', 'saturate'))
-            radio.on_clicked(exceed)
+        rax = fig.add_axes([0.75, 0.9, 0.15, 0.1])
+        radio = RadioButtons(rax, ('scale', 'saturate'))
+        
+        def exceed(label):
+            options = {'scale': 0, 'saturate': 1}
+            option = options[label]
+            if option == 0:  # scale
+                for i in range(len(self.selectedAudio)):
+                    if self.selectedAudio[i] > 1:
+                        self.selectedAudio[i] = 1
+                    elif self.selectedAudio[i] < -1:
+                        self.selectedAudio[i] = -1
+            elif option == 1:  # saturate
+                if max(self.selectedAudio) > 1:
+                    self.selectedAudio = self.selectedAudio/max(abs(self.selectedAudio))
+                elif min(self.selectedAudio) < -1:
+                    self.selectedAudio = self.selectedAudio/min(abs(self.selectedAudio))
+            rax._radio = radio
+        
+        radio.on_clicked(exceed)

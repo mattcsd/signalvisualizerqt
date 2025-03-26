@@ -1,6 +1,14 @@
 # Core dependencies
 PyQt5>=5.15
 matplotlib>=3.0
+librosa
+PyQtWebEngine
+sounddevice
+googleads
+parselmouth
+colorednoise
+
+
 
 # Platform-specific dependencies (optional but recommended)
 pywin32; sys_platform == 'win32'  # For Windows DPI handling

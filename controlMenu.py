@@ -749,10 +749,13 @@ class ControlMenu():
                                         number_of_filters=numFilters,
                                         ceiling=maxpitch,
                                         max_number_of_candidates=maxCandidates)
+        
         pitch_values = pitch.selected_array['frequency'] # extract selected pitch contour
         pitch_values[pitch_values==0] = np.nan # replace unvoiced samples by NaN to not plot
 
         return pitch, pitch_values
+
+        
     
     
     def designFilter(self, cm, gpass, gstop):
