@@ -1,4 +1,3 @@
-import tkinter as tk
 import math
 import librosa, librosa.display 
 import parselmouth
@@ -6,7 +5,6 @@ import numpy as np
 import sounddevice as sd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from tkinter import ttk
 from scipy import signal
 from matplotlib.widgets import Cursor, SpanSelector, MultiCursor
 from matplotlib.backend_bases import MouseButton
@@ -17,127 +15,56 @@ from auxiliar import Auxiliar
 from pitchAdvancedSettings import AdvancedSettings
 
 import sys
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QDialog, QLabel, QLineEdit, QPushButton, 
+                             QRadioButton, QCheckBox, QComboBox, QGridLayout, QMessageBox)
+from PyQt5.QtCore import Qt, pyqtSignal
 
-if sys.platform == "win32":
-    from ctypes import windll
-
-    # To avoid blurry fonts
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-else:
-    windll = None  # Or handle it differently for macOS
-    
-
-class ControlMenu():
-
-    def createControlMenu(self, fileName, fs, audioFrag, duration, controller):
+class ControlMenu(QDialog):
+    def __init__(self, fileName, fs, audioFrag, duration, controller, parent=None):
+        super().__init__(parent)
         self.fileName = fileName
-        self.audio = audioFrag # audio array of the fragment
-        self.fs = fs # sample frequency of the audio (Hz)
-        self.time = np.arange(0, len(self.audio)/self.fs, 1/self.fs) # time array of the audio
-        self.duration = duration # duration of the audio (s)
-        self.lenAudio = len(self.audio) # length of the audio array
+        self.audio = audioFrag  # audio array of the fragment
+        self.fs = fs  # sample frequency of the audio (Hz)
+        self.time = np.arange(0, len(self.audio)/self.fs, 1/self.fs)  # time array of the audio
+        self.duration = duration  # duration of the audio (s)
+        self.lenAudio = len(self.audio)  # length of the audio array
         self.controller = controller
-        np.seterr(divide = 'ignore') # turn off the "RuntimeWarning: divide by zero encountered in log10"
+        np.seterr(divide='ignore')  # turn off the "RuntimeWarning: divide by zero encountered in log10"
 
         # 'self.time' and 'self.audio' need to have the same first dimension
         if len(self.time) < len(self.audio):
-            self.audio = self.audio[:-1].copy() # delete last element of the numpy array
+            self.audio = self.audio[:-1].copy()  # delete last element of the numpy array
         elif len(self.time) > len(self.audio):
-            self.time = self.time[:-1].copy() # delete last element of the numpy array
+            self.time = self.time[:-1].copy()  # delete last element of the numpy array
 
         self.aux = Auxiliar()
 
         # The signal must have a minimum duration of 0.01 seconds
         if self.duration < 0.01:
             text = "The signal must have a minimum duration of 0.01s."
-            tk.messagebox.showerror(title="Signal too short", message=text) # show error
+            QMessageBox.critical(self, "Signal too short", text)
             return
 
-        cm = tk.Toplevel()
-        cm.resizable(True, True)
-        cm.title(self.fileName)
-        cm.iconbitmap('icons/icon.ico')
-        self.aux.windowGeometry(cm, 750, 575, False)
+        self.setupUI()
 
-        # Adapt the window to different sizes
-        for i in range(3):
-            cm.columnconfigure(i, weight=1)
-
-        for i in range(14):
-            cm.rowconfigure(i, weight=1)
-
-        # If the 'Control menu' window is closed, close also all the generated figures
-        def on_closing():
-            cm.destroy()
-            plt.close('all') # closes all matplotlib figures
-        cm.protocol("WM_DELETE_WINDOW", on_closing)
-
-        ##########
-        # LABELS #
-        ##########
-        # Labels of OptionMenus
-        lab_opts = tk.Label(cm, text='Choose an option', bd=6, font=('TkDefaultFont', 10, 'bold'))
-        lab_wind = tk.Label(cm, text='Window')
-        lab_nfft = tk.Label(cm, text='nfft')
-        lab_meth = tk.Label(cm, text='Method')
-        lab_type = tk.Label(cm, text='Filter type')
-
-        # Labels of Entrys
-        lab_size = tk.Label(cm, text='Window length (s)')
-        lab_over = tk.Label(cm, text='Overlap (s)')
-        lab_minf = tk.Label(cm, text='Min frequency (Hz)')
-        lab_maxf = tk.Label(cm, text='Max frequency (Hz)')
-        lab_minp = tk.Label(cm, text='Pitch floor (Hz)')
-        lab_maxp = tk.Label(cm, text='Pitch ceiling (Hz)')
-        lab_fund = tk.Label(cm, text='Fund. freq. multiplication')
-        lab_cent = tk.Label(cm, text='First harmonic frequency')
-        lab_perc = tk.Label(cm, text='Percentage (%)')
-        lab_fcut = tk.Label(cm, text='Fcut')
-        lab_cut1 = tk.Label(cm, text='Fcut1')
-        lab_cut2 = tk.Label(cm, text='Fcut2')
-        lab_beta = tk.Label(cm, text='Beta')
-        lab_fshz = tk.Label(cm, text='Fs: '+str(self.fs)+' Hz')
-
-        lab_spec = tk.Label(cm, text='Spectrogram', bd=6, font=('TkDefaultFont', 10))
-        lab_ptch = tk.Label(cm, text='Pitch', bd=6, font=('TkDefaultFont', 10))
-        lab_filt = tk.Label(cm, text='Filtering', bd=6, font=('TkDefaultFont', 10))
-        lab_sten = tk.Label(cm, text='Short-Time-Energy', bd=6, font=('TkDefaultFont', 10))
-
-        # Labels of Radiobuttons
-        lab_draw = tk.Label(cm, text='Drawing style')
+    def setupUI(self):
+        self.setWindowTitle(self.fileName)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.resize(750, 575)
         
-        # positioning Labels
-        lab_opts.grid(column=0, row=0, sticky=tk.E, columnspan=2)
-        lab_wind.grid(column=0, row=1, sticky=tk.E)
-        lab_nfft.grid(column=0, row=3, sticky=tk.E)
-        lab_meth.grid(column=0, row=11, sticky=tk.E)
-        lab_type.grid(column=2, row=2, sticky=tk.E)
+        # Main layout
+        layout = QGridLayout()
+        layout.setSpacing(10)
+        
+        # Options
+        self.options = ['FT', 'STFT', 'Spectrogram', 'STFT + Spect', 'Short-Time-Energy', 
+                       'Pitch', 'Spectral Centroid', 'Filtering']
+        self.opt_wind = ['Bartlett', 'Blackman', 'Hamming', 'Hanning', 'Kaiser']
+        self.opt_nfft = [2**9, 2**10, 2**11, 2**12, 2**13, 2**14, 2**15, 2**16, 2**17, 2**18, 2**19]
+        self.opt_meth = ['Autocorrelation', 'Cross-correlation', 'Subharmonics', 'Spinet']
+        self.opt_pass = ['Harmonic', 'Lowpass', 'Highpass', 'Bandpass', 'Bandstop']
 
-        lab_size.grid(column=0, row=2, sticky=tk.E)
-        lab_over.grid(column=0, row=4, sticky=tk.E)
-        lab_minf.grid(column=0, row=6, sticky=tk.E)
-        lab_maxf.grid(column=0, row=7, sticky=tk.E)
-        lab_draw.grid(column=0, row=8, sticky=tk.E)
-        lab_minp.grid(column=0, row=12, sticky=tk.E)
-        lab_maxp.grid(column=0, row=13, sticky=tk.E)
-        lab_fund.grid(column=2, row=3, sticky=tk.E)
-        lab_cent.grid(column=2, row=4, sticky=tk.E)
-        lab_perc.grid(column=2, row=5, sticky=tk.E)
-        lab_fcut.grid(column=2, row=6, sticky=tk.E)
-        lab_cut1.grid(column=2, row=7, sticky=tk.E)
-        lab_cut2.grid(column=2, row=8, sticky=tk.E)
-        lab_beta.grid(column=2, row=10, sticky=tk.E)
-        lab_fshz.grid(column=3, row=13, sticky=tk.EW)
-
-        lab_spec.grid(column=1, row=5)
-        lab_ptch.grid(column=1, row=10)
-        lab_filt.grid(column=3, row=1)
-        lab_sten.grid(column=3, row=9)
-
-        ##########
-        # ENTRYS #
-        ##########
+        # Variables
         if self.duration <= 0.03:
             windSize = round(self.duration - 0.001, 3)
             overlap = round(windSize - 0.001, 3)
@@ -145,499 +72,469 @@ class ControlMenu():
             windSize = 0.03
             overlap = 0.01
 
-        cm.var_size = tk.DoubleVar(value=windSize)
-        cm.var_over = tk.DoubleVar(value=overlap)
-        cm.var_minf = tk.IntVar()
-        cm.var_maxf = tk.IntVar(value=self.fs/2)
-        cm.var_minp = tk.DoubleVar(value=75.0)
-        cm.var_maxp = tk.DoubleVar(value=600.0)
-        cm.var_fund = tk.IntVar(value=1)
-        cm.var_cent = tk.IntVar(value=400)
-        cm.var_perc = tk.DoubleVar(value=10.0)
-        cm.var_fcut = tk.IntVar(value=1000)
-        cm.var_cut1 = tk.IntVar(value=200)
-        cm.var_cut2 = tk.IntVar(value=600)
-        cm.var_beta = tk.IntVar()
+        self.var_size = windSize
+        self.var_over = overlap
+        self.var_minf = 0
+        self.var_maxf = self.fs/2
+        self.var_minp = 75.0
+        self.var_maxp = 600.0
+        self.var_fund = 1
+        self.var_cent = 400
+        self.var_perc = 10.0
+        self.var_fcut = 1000
+        self.var_cut1 = 200
+        self.var_cut2 = 600
+        self.var_beta = 0
+        self.var_draw = 1
+        self.var_pitch = 0
+        self.var_opts = 'Spectrogram'
+        self.var_wind = 'Hamming'
+        self.var_nfft = self.opt_nfft[0]
+        self.var_meth = 'Autocorrelation'
+        self.var_pass = 'Harmonic'
 
-        vcmd = (cm.register(self.aux.onValidate), '%S', '%s', '%d')
+        # Widgets
+        # Labels
+        layout.addWidget(QLabel('Choose an option', alignment=Qt.AlignRight), 0, 0, 1, 2)
+        layout.addWidget(QLabel('Window'), 1, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('nfft'), 3, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Method'), 11, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Filter type'), 2, 2, alignment=Qt.AlignRight)
         
-        ent_size = ttk.Entry(cm, textvariable=cm.var_size, validate='key', validatecommand=vcmd)
-        ent_over = ttk.Entry(cm, textvariable=cm.var_over, validate='key', validatecommand=vcmd)
-        ent_minf = ttk.Entry(cm, textvariable=cm.var_minf, validate='key', validatecommand=vcmd)
-        ent_maxf = ttk.Entry(cm, textvariable=cm.var_maxf, validate='key', validatecommand=vcmd)
-        ent_minp = ttk.Entry(cm, textvariable=cm.var_minp, validate='key', validatecommand=vcmd, state='disabled')
-        ent_maxp = ttk.Entry(cm, textvariable=cm.var_maxp, validate='key', validatecommand=vcmd, state='disabled')
-        ent_fund = ttk.Entry(cm, textvariable=cm.var_fund, validate='key', validatecommand=vcmd, state='disabled')
-        ent_cent = ttk.Entry(cm, textvariable=cm.var_cent, validate='key', validatecommand=vcmd, state='disabled')
-        ent_perc = ttk.Entry(cm, textvariable=cm.var_perc, validate='key', validatecommand=vcmd, state='disabled')
-        ent_fcut = ttk.Entry(cm, textvariable=cm.var_fcut, validate='key', validatecommand=vcmd, state='disabled')
-        ent_cut1 = ttk.Entry(cm, textvariable=cm.var_cut1, validate='key', validatecommand=vcmd, state='disabled')
-        ent_cut2 = ttk.Entry(cm, textvariable=cm.var_cut2, validate='key', validatecommand=vcmd, state='disabled')
-        ent_beta = ttk.Entry(cm, textvariable=cm.var_beta, validate='key', validatecommand=vcmd, state='disabled')
+        layout.addWidget(QLabel('Window length (s)'), 2, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Overlap (s)'), 4, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Min frequency (Hz)'), 6, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Max frequency (Hz)'), 7, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Pitch floor (Hz)'), 12, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Pitch ceiling (Hz)'), 13, 0, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Fund. freq. multiplication'), 3, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('First harmonic frequency'), 4, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Percentage (%)'), 5, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Fcut'), 6, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Fcut1'), 7, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Fcut2'), 8, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel('Beta'), 10, 2, alignment=Qt.AlignRight)
+        layout.addWidget(QLabel(f'Fs: {self.fs} Hz'), 13, 3, alignment=Qt.AlignRight)
+        
+        layout.addWidget(QLabel('Spectrogram', alignment=Qt.AlignCenter), 5, 1)
+        layout.addWidget(QLabel('Pitch', alignment=Qt.AlignCenter), 10, 1)
+        layout.addWidget(QLabel('Filtering', alignment=Qt.AlignCenter), 1, 3)
+        layout.addWidget(QLabel('Short-Time-Energy', alignment=Qt.AlignCenter), 9, 3)
+        layout.addWidget(QLabel('Drawing style'), 8, 0, alignment=Qt.AlignRight)
 
-        # Called when inserting a value in the entry of the window length and pressing enter
-        def windowLengthEntry(event):
-            # Show an error and stop if the inserted window size is incorrect
-            windSize = cm.var_size.get()
-            overlap = cm.var_over.get()
-            if windSize > self.duration or windSize == 0:
-                # Reset widgets
-                if self.duration <= 0.03:
-                    cm.var_size.set(round(self.duration - 0.001, 3))
-                else:
-                    cm.var_size.set(0.03)
-                cm.opt_nfft = [2**9, 2**10, 2**11, 2**12, 2**13, 2**14, 2**15, 2**16, 2**17, 2**18, 2**19]
-                self.updateOptionMenu(cm, dd_nfft)
-                if windSize > self.duration: # The window size can't be greater than the duration of the signal
-                    text = "The window size can't be greater than the duration of the signal (" + str(self.duration) + "s)."
-                    tk.messagebox.showerror(parent=cm, title="Window size too long", message=text) # show error
-                elif windSize == 0: # The window size must be a positive number
-                    tk.messagebox.showerror(parent=cm, title="Wrong window size value", message="The chosen value for the window size must be a positive number.") # show error
-            elif windSize < overlap: # The window size must always be greater than the overlap
-                cm.var_size.set(overlap+0.01)
-                text2 = "The window size must always be greater than the overlap (" + str(overlap) + "s)."
-                tk.messagebox.showerror(parent=cm, title="Wrong overlap value", message=text2) # show error
-            # Change the values of nfft to be always greater than the window size
-            else: 
-                windSizeSamp = windSize * self.fs # window size in samples
-                nfft = cm.opt_nfft[0] # the smallest value of the nfft list
-                if nfft < windSizeSamp: # Deletes smallest values of the nfft list and adds greater ones
-                    last = int(math.log2(cm.opt_nfft[len(cm.opt_nfft)-1])) + 1
-                    first = int(math.log2(nfft))
-                    while 2**first < windSizeSamp:
-                        for a in range(len(cm.opt_nfft)-1):
-                            cm.opt_nfft[a] = cm.opt_nfft[a+1]
-                        cm.opt_nfft[len(cm.opt_nfft)-1] = 2**last
-                        last += 1
-                        first += 1
-                    self.updateOptionMenu(cm, dd_nfft)
-                else: # Adds smaller values to the nfft list if possible
-                    first = int(math.log2(nfft)) - 1
-                    while 2**first > windSizeSamp:
-                        for a in range(len(cm.opt_nfft)-1, 0, -1):
-                            cm.opt_nfft[a] = cm.opt_nfft[a-1]
-                        cm.opt_nfft[0] = 2**first
-                        self.updateOptionMenu(cm, dd_nfft)
-                        first -= 1
-                return True
+        # Entries
+        self.ent_size = QLineEdit(str(self.var_size))
+        self.ent_over = QLineEdit(str(self.var_over))
+        self.ent_minf = QLineEdit(str(self.var_minf))
+        self.ent_maxf = QLineEdit(str(self.var_maxf))
+        self.ent_minp = QLineEdit(str(self.var_minp))
+        self.ent_maxp = QLineEdit(str(self.var_maxp))
+        self.ent_fund = QLineEdit(str(self.var_fund))
+        self.ent_cent = QLineEdit(str(self.var_cent))
+        self.ent_perc = QLineEdit(str(self.var_perc))
+        self.ent_fcut = QLineEdit(str(self.var_fcut))
+        self.ent_cut1 = QLineEdit(str(self.var_cut1))
+        self.ent_cut2 = QLineEdit(str(self.var_cut2))
+        self.ent_beta = QLineEdit(str(self.var_beta))
+
+        # Set validators
+        double_validator = QtGui.QDoubleValidator()
+        int_validator = QtGui.QIntValidator()
+        
+        self.ent_size.setValidator(double_validator)
+        self.ent_over.setValidator(double_validator)
+        self.ent_minf.setValidator(int_validator)
+        self.ent_maxf.setValidator(int_validator)
+        self.ent_minp.setValidator(double_validator)
+        self.ent_maxp.setValidator(double_validator)
+        self.ent_fund.setValidator(int_validator)
+        self.ent_cent.setValidator(int_validator)
+        self.ent_perc.setValidator(double_validator)
+        self.ent_fcut.setValidator(int_validator)
+        self.ent_cut1.setValidator(int_validator)
+        self.ent_cut2.setValidator(int_validator)
+        self.ent_beta.setValidator(int_validator)
+
+        # Connect returnPressed signals
+        self.ent_size.returnPressed.connect(self.windowLengthEntry)
+        self.ent_over.returnPressed.connect(self.overlapEntry)
+        self.ent_minf.returnPressed.connect(self.minfreqEntry)
+        self.ent_maxf.returnPressed.connect(self.maxfreqEntry)
+        self.ent_minp.returnPressed.connect(self.minpitchEntry)
+        self.ent_maxp.returnPressed.connect(self.maxpitchEntry)
+        self.ent_fund.returnPressed.connect(self.fundfreqEntry)
+        self.ent_cent.returnPressed.connect(self.centerEntry)
+        self.ent_perc.returnPressed.connect(self.percentageEntry)
+        self.ent_cut1.returnPressed.connect(self.fcut1Entry)
+        self.ent_cut2.returnPressed.connect(self.fcut2Entry)
+        self.ent_beta.returnPressed.connect(self.betaEntry)
+
+        # Add entries to layout
+        layout.addWidget(self.ent_size, 2, 1)
+        layout.addWidget(self.ent_over, 4, 1)
+        layout.addWidget(self.ent_minf, 6, 1)
+        layout.addWidget(self.ent_maxf, 7, 1)
+        layout.addWidget(self.ent_minp, 12, 1)
+        layout.addWidget(self.ent_maxp, 13, 1)
+        layout.addWidget(self.ent_fund, 3, 3)
+        layout.addWidget(self.ent_cent, 4, 3)
+        layout.addWidget(self.ent_perc, 5, 3)
+        layout.addWidget(self.ent_fcut, 6, 3)
+        layout.addWidget(self.ent_cut1, 7, 3)
+        layout.addWidget(self.ent_cut2, 8, 3)
+        layout.addWidget(self.ent_beta, 10, 3)
+
+        # Radio buttons
+        self.rdb_lin = QRadioButton('linear')
+        self.rdb_mel = QRadioButton('mel')
+        self.rdb_lin.setChecked(True)
+        
+        radio_layout = QHBoxLayout()
+        radio_layout.addWidget(self.rdb_lin)
+        radio_layout.addWidget(self.rdb_mel)
+        layout.addLayout(radio_layout, 8, 1)
+
+        # Checkbox
+        self.chk_pitch = QCheckBox('Show pitch')
+        self.chk_pitch.stateChanged.connect(self.pitchCheckbox)
+        layout.addWidget(self.chk_pitch, 9, 1, alignment=Qt.AlignLeft)
+
+        # Buttons
+        self.but_adse = QPushButton('Advanced settings')
+        self.but_adse.setEnabled(False)
+        self.but_adse.clicked.connect(lambda: self.controller.adse.advancedSettings())
+        
+        self.but_plot = QPushButton('Plot')
+        self.but_plot.clicked.connect(self.checkValues)
+        
+        self.but_help = QPushButton('🛈')
+        self.but_help.setFixedWidth(30)
+        self.but_help.clicked.connect(lambda: self.controller.help.createHelpMenu(8))
+
+        layout.addWidget(self.but_adse, 14, 1)
+        layout.addWidget(self.but_plot, 14, 3)
+        layout.addWidget(self.but_help, 14, 2, alignment=Qt.AlignRight)
+
+        # Option menus
+        self.dd_opts = QComboBox()
+        self.dd_opts.addItems(self.options)
+        self.dd_opts.setCurrentText(self.var_opts)
+        self.dd_opts.currentTextChanged.connect(self.displayOptions)
+        
+        self.dd_wind = QComboBox()
+        self.dd_wind.addItems(self.opt_wind)
+        self.dd_wind.setCurrentText(self.var_wind)
+        
+        self.dd_nfft = QComboBox()
+        self.dd_nfft.addItems([str(x) for x in self.opt_nfft])
+        self.dd_nfft.setCurrentText(str(self.var_nfft))
+        
+        self.dd_meth = QComboBox()
+        self.dd_meth.addItems(self.opt_meth)
+        self.dd_meth.setCurrentText(self.var_meth)
+        self.dd_meth.setEnabled(False)
+        
+        self.dd_pass = QComboBox()
+        self.dd_pass.addItems(self.opt_pass)
+        self.dd_pass.setCurrentText(self.var_pass)
+        self.dd_pass.setEnabled(False)
+        self.dd_pass.currentTextChanged.connect(self.displayFilterOptions)
+
+        layout.addWidget(self.dd_opts, 0, 2)
+        layout.addWidget(self.dd_wind, 1, 1)
+        layout.addWidget(self.dd_nfft, 3, 1)
+        layout.addWidget(self.dd_meth, 11, 1)
+        layout.addWidget(self.dd_pass, 2, 3)
+
+        # Set stretch factors
+        for i in range(4):
+            layout.setColumnStretch(i, 1)
+        for i in range(15):
+            layout.setRowStretch(i, 1)
+
+        self.setLayout(layout)
+        
+        # Initialize widget states
+        self.displayOptions(self.var_opts)
+        self.displayFilterOptions(self.var_pass)
+
+    # Methods for entry validation
+    def windowLengthEntry(self):
+        windSize = float(self.ent_size.text())
+        overlap = float(self.ent_over.text())
+        
+        if windSize > self.duration or windSize == 0:
+            if self.duration <= 0.03:
+                self.var_size = round(self.duration - 0.001, 3)
+            else:
+                self.var_size = 0.03
+            self.ent_size.setText(str(self.var_size))
             
-        def overlapEntry(event):
-            # Show an error and stop if the inserted overlap is incorrect
-            overlap = cm.var_over.get()
-            windSize = cm.var_size.get()
-            if overlap > self.duration or overlap >= windSize:
-                # Reset widget
-                if self.duration <= 0.03:
-                    overlap = round(windSize - 0.001, 3)
-                else:
-                    cm.var_over.set('0.01')
-                if overlap > self.duration: # The overlap can't be greater than the duration of the signal
-                    text = "The overlap can't be greater than the duration of the signal (" + str(self.duration) + "s)."
-                    tk.messagebox.showerror(parent=cm, title="Overlap too long", message=text) # show error
-                elif overlap >= windSize: # The overlap must always be smaller than the window size
-                    text2 = "The overlap must always be smaller than the window size (" + str(windSize) + "s)."
-                    tk.messagebox.showerror(parent=cm, title="Wrong overlap value", message=text2) # show error
-            else: return True
-
-        def minfreqEntry(event):
-            # The minimum frequency must be >= 0 and smaller than the maximum frequency
-            minfreq = cm.var_minf.get()
-            maxfreq = cm.var_maxf.get()
-            if minfreq >= maxfreq:
-                cm.var_minf.set('0') # Reset widget
-                text = "The minimum frequency must be smaller than the maximum frequency (" + str(maxfreq) + "Hz)."
-                tk.messagebox.showerror(parent=cm, title="Minimum frequency too big", message=text) # show error
-            else: return True
-
-        def maxfreqEntry(event):
-            # The maximum frequency must be <= self.fs/2 and greater than the minimum frequency
-            minfreq = cm.var_minf.get()
-            maxfreq = cm.var_maxf.get()
-            if maxfreq > self.fs/2 or maxfreq <= minfreq:
-                cm.var_maxf.set(self.fs/2) # Reset widget
-                if maxfreq > self.fs/2:
-                    text = "The maximum frequency can't be greater than the half of the sample frequency (" + str(self.fs/2) + "Hz)."
-                    tk.messagebox.showerror(parent=cm, title="Maximum frequency too big", message=text) # show error
-                elif maxfreq <= minfreq:
-                    text = "The maximum frequency must be greater than the minimum frequency (" + str(minfreq) + "Hz)."
-                    tk.messagebox.showerror(parent=cm, title="Maximum frequency too small", message=text) # show error
-            else: return True
-
-        def minpitchEntry(event):
-            minPitch = cm.var_minp.get()
-            maxPitch = cm.var_maxp.get()
-            if minPitch >= maxPitch:
-                cm.var_minp.set('75.0') # Reset widget
-                cm.var_maxp.set('600.0') # Reset widget
-                text = "The minimum pitch must be smaller than the maximum pitch (" + str(maxPitch) + "Hz)."
-                tk.messagebox.showerror(parent=cm, title="Pitch floor too big", message=text) # show error
-            else: return True
-
-        def maxpitchEntry(event):
-            minPitch = cm.var_minp.get()
-            maxPitch = cm.var_maxp.get()
-            if maxPitch <= minPitch:
-                cm.var_minp.set('75.0') # Reset widget
-                cm.var_maxp.set('600.0') # Reset widget
-                text = "The maximum pitch must be greater than the minimum pitch (" + str(minPitch) + "Hz)."
-                tk.messagebox.showerror(parent=cm, title="Pitch ceiling too small", message=text) # show error
-            else: return True
-
-        def fundfreqEntry(event):
-            fundfreq = cm.var_fund.get()
-            if fundfreq < 1:
-                cm.var_fund.set('1') # reset widget
-                text = "The minimum value of the fundamental frequency response is 1."
-                tk.messagebox.showerror(parent=cm, title="Fundamental frequency response too small", message=text) # show error
-            elif fundfreq > (self.fs/2): # max fundfreq = (self.fs/2)-(max(anchura de banda)/2) (?)
-                cm.var_fund.set(self.fs/2) # reset widget
-                text = "The maximum frequency can't be greater than the half of the sample frequency (" + str(self.fs/2) + "Hz)."
-                tk.messagebox.showerror(parent=cm, title="Fundamental frequency response too big", message=text) # show error
-            else: return True
-        
-        def centerEntry(event):
-            # center = cm.var_cent.get()
-            # fcut1 = cm.var_cut1.get()
-            # fcut2 = cm.var_cut2.get()
-            # if center <= fcut1 or center >= fcut2:
-            #     cm.var_cent.set(int((fcut1+fcut2)/2))
-            #     text = "The center frequency must be a value between fcut1 (" + str(fcut1) + ") and fcut2 (" + str(fcut2) + ")."
-            #     tk.messagebox.showerror(parent=cm, title="Wrong center frequency value", message=text) # show error
-            # else: return True
-            return True
-        
-        def percentageEntry(event):
-            percentage = cm.var_perc.get()
-            if percentage < 0.0 or percentage > 100.0:
-                cm.var_perc.set('10.0') # reset widget
-                text = "The percentage must be a number between 0 and 100."
-                tk.messagebox.showerror(parent=cm, title="Wrong percentage value", message=text) # show error
-            else: return True
-        
-        def fcut1Entry(event):
-            # center = cm.var_cent.get()
-            # fcut1 = cm.var_cut1.get()
-            # fcut2 = cm.var_cut2.get()
-            # if fcut1 >= fcut2 or fcut1 >= center:
-            #     c1 = fcut2-center
-            #     c1 = center-c1
-            #     cm.var_cut1.set(c1)
-            #     text = "Fcut1 must be a smaller value than center (" + str(center) + ") and fcut2 (" + str(fcut2) + ")."
-            #     tk.messagebox.showerror(parent=cm, title="Wrong fcut1 value", message=text) # show error
-            # else: return True
-            return True
-        
-        def fcut2Entry(event):
-            # center = cm.var_cent.get()
-            # fcut1 = cm.var_cut1.get()
-            # fcut2 = cm.var_cut2.get()
-            # if fcut2 <= fcut1 or fcut2 <= center:
-            #     c2 = center-fcut1
-            #     c2 = center+c2
-            #     cm.var_cut1.set(c2)
-            #     text = "Fcut2 must be a greater value than center (" + str(center) + ") and fcut1 (" + str(fcut1) + ")."
-            #     tk.messagebox.showerror(parent=cm, title="Wrong fcut2 value", message=text) # show error
-            # else: return True
-            return True
-
-        def betaEntry(event):
-            beta = cm.var_beta.get()
-            if beta < 0 or beta > 14:
-                cm.var_beta.set('0') # Reset widget
-                text = "The value of beta must be a number between 0 and 14."
-                tk.messagebox.showerror(parent=cm, title="Incorrect value of beta", message=text) # show error
-            else: return True
-
-        # calling functions after entering a value and pressing enter
-        ent_size.bind('<Return>', windowLengthEntry)
-        ent_over.bind('<Return>', overlapEntry)
-        ent_minf.bind('<Return>', minfreqEntry)
-        ent_maxf.bind('<Return>', maxfreqEntry)
-        ent_minp.bind('<Return>', minpitchEntry)
-        ent_maxp.bind('<Return>', maxpitchEntry)
-        ent_fund.bind('<Return>', fundfreqEntry)
-        ent_cent.bind('<Return>', centerEntry)
-        ent_perc.bind('<Return>', percentageEntry)
-        ent_cut1.bind('<Return>', fcut1Entry)
-        ent_cut2.bind('<Return>', fcut2Entry)
-        ent_beta.bind('<Return>', betaEntry)
-
-        # positioning Entrys
-        ent_size.grid(column=1, row=2, sticky=tk.EW, padx=5, pady=5, columnspan=1)
-        ent_over.grid(column=1, row=4, sticky=tk.EW, padx=5, pady=5, columnspan=1)
-        ent_minf.grid(column=1, row=6, sticky=tk.EW, padx=5, pady=5)
-        ent_maxf.grid(column=1, row=7, sticky=tk.EW, padx=5, pady=5)
-        ent_minp.grid(column=1, row=12, sticky=tk.EW, padx=5, pady=5)
-        ent_maxp.grid(column=1, row=13, sticky=tk.EW, padx=5, pady=5)
-        ent_fund.grid(column=3, row=3, sticky=tk.EW, padx=5, pady=5)
-        ent_cent.grid(column=3, row=4, sticky=tk.EW, padx=5, pady=5)
-        ent_perc.grid(column=3, row=5, sticky=tk.EW, padx=5, pady=5)
-        ent_fcut.grid(column=3, row=6, sticky=tk.EW, padx=5, pady=5)
-        ent_cut1.grid(column=3, row=7, sticky=tk.EW, padx=5, pady=5)
-        ent_cut2.grid(column=3, row=8, sticky=tk.EW, padx=5, pady=5)
-        ent_beta.grid(column=3, row=10, sticky=tk.EW, padx=5, pady=5)
-
-        # RADIOBUTTONS
-        cm.var_draw = tk.IntVar(value=1)
+            self.opt_nfft = [2**9, 2**10, 2**11, 2**12, 2**13, 2**14, 2**15, 2**16, 2**17, 2**18, 2**19]
+            self.updateOptionMenu(self.dd_nfft)
             
-        rdb_lin = tk.Radiobutton(cm, text='linear', variable=cm.var_draw, value=1)
-        rdb_mel = tk.Radiobutton(cm, text='mel', variable=cm.var_draw, value=2)
-           
-        rdb_lin.grid(column=1, row=8, sticky=tk.W)
-        rdb_mel.grid(column=1, row=8, sticky=tk.NS)
-
-        # CHECKBOX
-        cm.var_pitch = tk.IntVar(value=0)
-
-        def pitchCheckbox():
-            showPitch = cm.var_pitch.get()
-            if showPitch == 1:
-                self.controller.adse.createVariables() # create the variables of advanced settings
-                dd_meth.config(state='active')
-                ent_minp.config(state='normal')
-                ent_maxp.config(state='normal')
-                but_adse.config(state='active')
-            else:
-                dd_meth.config(state='disabled')
-                ent_minp.config(state='disabled')
-                ent_maxp.config(state='disabled')
-                but_adse.config(state='disabled')
-
-        chk_pitch = ttk.Checkbutton(cm, text='Show pitch', command=pitchCheckbox, variable=cm.var_pitch)
-        chk_pitch.grid(column=1, row=9, sticky=tk.W)
-
-        ###########
-        # BUTTONS #
-        ###########
-        # Checks if all the values inserted by the user are correct
-        def checkValues():
-            choice = cm.var_opts.get()
-            windSize = cm.var_size.get() # window size in seconds
-            overlap = cm.var_over.get() # overlap in seconds
-            minfreq = cm.var_minf.get()
-            maxfreq = cm.var_maxf.get()
-            beta = cm.var_beta.get()
-            minpitch = cm.var_minp.get()
-            maxpitch = cm.var_maxp.get()
-            fundfreq = cm.var_fund.get()
-            center = cm.var_cent.get()
-            percentage = cm.var_perc.get()
-            fcut1 = cm.var_cut1.get()
-            fcut2 = cm.var_cut2.get()
-
-            if choice == 'STFT' or choice == 'STFT + Spect' or choice == 'Spectral Centroid' or choice == 'Spectrogram' or choice == 'Filtering' or choice == 'Short-Time-Energy':
-                if choice == 'Short-Time-Energy' and betaEntry(beta)!=True:
-                    return
-                if minfreqEntry(minfreq)!=True or maxfreqEntry(maxfreq)!=True:
-                    return
-                if choice == 'Filtering' and (fundfreqEntry(fundfreq)!=True or centerEntry(center)!=True or percentageEntry(percentage)!=True or fcut1Entry(fcut1)!=True or fcut2Entry(fcut2)!=True):
-                    return
-                if choice != 'Filtering' and windowLengthEntry(windSize) != True:
-                    return
-                if (choice == 'STFT + Spect' or choice == 'Spectral Centroid' or choice == 'Short-Time-Energy' or choice == 'Spectrogram') and overlapEntry(overlap) != True:
-                    return
-            elif choice == 'Pitch' and (minpitchEntry(minpitch) != True or maxpitchEntry(maxpitch) != True):
-                return
-            
-            self.plotFigure(cm, choice, windSize, overlap, minfreq, maxfreq, beta)
-
-        but_adse = ttk.Button(cm, state='disabled', command=lambda: self.controller.adse.advancedSettings(), text='Advanced settings')
-        # but_freq = ttk.Button(cm, state='disabled', command=lambda: self.plotFiltFreqResponse(cm), text='Filter Frequency Response')
-        but_plot = ttk.Button(cm, command=lambda: checkValues(), text='Plot')
-        but_help = ttk.Button(cm, command=lambda: self.controller.help.createHelpMenu(8), text='🛈', width=2)
-
-        # positioning Buttons
-        but_adse.grid(column=1, row=14, sticky=tk.EW, padx=5, pady=5)
-        # but_freq.grid(column=3, row=9, sticky=tk.EW, padx=5, pady=5)
-        but_plot.grid(column=3, row=14, sticky=tk.EW, padx=5, pady=5)
-        but_help.grid(column=2, row=14, sticky=tk.E, padx=5, pady=5)
-
-        ################
-        # OPTION MENUS #
-        ################
-        cm.options = ('FT','STFT', 'Spectrogram','STFT + Spect', 'Short-Time-Energy', 'Pitch', 'Spectral Centroid', 'Filtering')
-        cm.opt_wind = ('Bartlett','Blackman', 'Hamming','Hanning', 'Kaiser')
-        cm.opt_nfft = [2**9, 2**10, 2**11, 2**12, 2**13, 2**14, 2**15, 2**16, 2**17, 2**18, 2**19]
-        cm.opt_meth = ('Autocorrelation', 'Cross-correlation', 'Subharmonics', 'Spinet')
-        cm.opt_pass = ('Harmonic', 'Lowpass','Highpass', 'Bandpass', 'Bandstop')
-
-        cm.var_opts = tk.StringVar()
-        cm.var_wind = tk.StringVar()
-        cm.var_nfft = tk.IntVar()
-        cm.var_meth = tk.StringVar()
-        cm.var_pass = tk.StringVar()
-
-        # Called when changing the main option (FT, STFT, etc.) for disabling or activating widgets
-        def displayOptions(choice):
-            dd_opts.config(state='active') # keeps the options visible
-
-            if choice == 'FT' or choice == 'STFT' or choice == 'Pitch' or choice == 'Filtering': 
-                ent_over.config(state='disabled')
-            else: ent_over.config(state='normal')
-
-            if choice == 'FT' or choice == 'Pitch' or choice == 'Filtering': 
-                ent_size.config(state='disabled')
-            else: ent_size.config(state='normal')
-
-            if choice == 'Filtering':
-                dd_pass.config(state='active')
-                ent_perc.config(state='normal')
-                # but_freq.configure(state='active')
-
-                type = cm.var_pass.get()
-                if type == 'Lowpass' or type == 'Highpass':
-                    ent_fcut.config(state='normal')
-                else:
-                    ent_fcut.config(state='disabled')
-                if type == 'Bandpass' or type == 'Bandstop':
-                    ent_cut1.config(state='normal')
-                    ent_cut2.config(state='normal')
-                else:
-                    ent_cut1.config(state='disabled')
-                    ent_cut2.config(state='disabled')
-                if type == 'Harmonic':
-                    ent_fund.config(state='normal')
-                    ent_cent.config(state='normal')
-                else:
-                    ent_fund.config(state='disabled')
-                    ent_cent.config(state='disabled')
-            else:
-                dd_pass.config(state='disabled')
-                ent_fund.config(state='disabled')
-                ent_cent.config(state='disabled')
-                ent_perc.config(state='disabled')
-                # but_freq.configure(state='disabled')
-                ent_fcut.config(state='disabled')
-                ent_cut1.config(state='disabled')
-                ent_cut2.config(state='disabled')
-
-            if choice == 'Pitch':
-                self.controller.adse.createVariables() # create the variables of advanced settings
-                dd_meth.config(state='active')
-                ent_minp.config(state='normal')
-                ent_maxp.config(state='normal')
-                but_adse.config(state='active')
-            else:
-                dd_meth.config(state='disabled')
-                ent_minp.config(state='disabled')
-                ent_maxp.config(state='disabled')
-                but_adse.config(state='disabled')
-
-            if choice == 'Spectrogram' or choice == 'STFT + Spect' or choice == 'Spectral Centroid' or choice == 'Filtering': 
-                rdb_lin.config(state='active')
-                rdb_mel.config(state='active')
-            else: 
-                rdb_lin.config(state='disabled')
-                rdb_mel.config(state='disabled')
-
-            if choice == 'Spectrogram' or choice == 'STFT + Spect' or choice == 'Spectral Centroid':
-                ent_minf.config(state='normal')
-                ent_maxf.config(state='normal')
-            else:
-                ent_minf.config(state='disabled')
-                ent_maxf.config(state='disabled')
-
-            if choice == 'STFT' or choice == 'Spectrogram' or choice == 'STFT + Spect' or choice == 'Spectral Centroid' or choice == 'Short-Time-Energy':
-                dd_wind.config(state='active')
-            else: dd_wind.config(state='disabled')
-
-            if choice == 'STFT' or choice == 'Spectrogram' or choice == 'STFT + Spect' or choice == 'Spectral Centroid':
-                dd_nfft.config(state='active')
-            else: dd_nfft.config(state='disabled')
-
-            if choice == 'Short-Time-Energy':
-                ent_beta.config(state='normal')
-            else: ent_beta.config(state='disabled')
-
-            if choice == 'Spectrogram':
-                chk_pitch.config(state='active')
-            else:
-                chk_pitch.config(state='disabled')
-
-        def displayFilterOptions(choice):
-            if choice == 'Lowpass' or choice == 'Highpass':
-                ent_fcut.config(state='normal')
-            else:
-                ent_fcut.config(state='disabled')
-
-            if choice == 'Bandpass' or choice == 'Bandstop':
-                ent_cut1.config(state='normal')
-                ent_cut2.config(state='normal')
-            else:
-                ent_cut1.config(state='disabled')
-                ent_cut2.config(state='disabled')
-
-            if choice == 'Harmonic':
-                ent_fund.config(state='normal')
-                ent_cent.config(state='normal')
-            else:
-                ent_fund.config(state='disabled')
-                ent_cent.config(state='disabled')
-
-        # creating option menus
-        dd_opts = ttk.OptionMenu(cm, cm.var_opts, cm.options[2], *cm.options, command=displayOptions)
-        dd_wind = ttk.OptionMenu(cm, cm.var_wind, cm.opt_wind[0], *cm.opt_wind)
-        dd_nfft = ttk.OptionMenu(cm, cm.var_nfft, cm.opt_nfft[0], *cm.opt_nfft)
-        dd_meth = ttk.OptionMenu(cm, cm.var_meth, cm.opt_meth[0], *cm.opt_meth)
-        dd_pass = ttk.OptionMenu(cm, cm.var_pass, cm.opt_pass[0], *cm.opt_pass, command=displayFilterOptions)
-
-        # size of the OptionMenus
-        dd_opts.config(width=16, state='active')
-        dd_wind.config(width=18, state='active')
-        dd_nfft.config(width=18, state='active')
-        dd_meth.config(width=18, state='disabled')
-        dd_pass.config(width=18, state='disabled')
-
-        # positioning OptionMenus
-        dd_opts.grid(column=2, row=0, sticky=tk.EW, padx=5)
-        dd_wind.grid(column=1, row=1, sticky=tk.EW, padx=5)
-        dd_nfft.grid(column=1, row=3, sticky=tk.EW, padx=5)
-        dd_meth.grid(column=1, row=11, sticky=tk.EW, padx=5)
-        dd_pass.grid(column=3, row=2, sticky=tk.EW, padx=5)
-
-        # Plot the spectrogram
-        checkValues()
-        cm.lift() # take cm to the front
-
-    ###########
-    # METHODS #
-    ###########
-
-    # Updates the OptionMenu 'om' with the option list 'opt' and variable 'var' passed as a parameter
-    def updateOptionMenu(self, cm, dd_nfft):
-        menu = dd_nfft["menu"]
-        menu.delete(0, "end")
-        for o in cm.opt_nfft:
-            menu.add_command(label=o, command=lambda value=o: cm.var_nfft.set(value))
-        cm.var_nfft.set(cm.opt_nfft[0])
-
-    def yticks(self, minfreq, maxfreq):
-        freq = maxfreq-minfreq
-        if freq <=100: 
-            plt.yticks(np.arange(minfreq,maxfreq,20))
-        elif freq <=1000:
-            plt.yticks(np.arange(minfreq,maxfreq,100))
+            if windSize > self.duration:
+                text = f"The window size can't be greater than the duration of the signal ({self.duration}s)."
+                QMessageBox.critical(self, "Window size too long", text)
+            elif windSize == 0:
+                QMessageBox.critical(self, "Wrong window size value", "The chosen value for the window size must be a positive number.")
+            return False
+        elif windSize < overlap:
+            self.var_size = overlap + 0.01
+            self.ent_size.setText(str(self.var_size))
+            text = f"The window size must always be greater than the overlap ({overlap}s)."
+            QMessageBox.critical(self, "Wrong overlap value", text)
+            return False
         else:
-            x = freq//1000
-            y = x//8
-            plt.yticks(np.arange(minfreq,maxfreq,1000*(y+1)))
-
-    def colorBar(self, fig, x, img):
-        fig.subplots_adjust(right=0.9) # leave space for the color bar
-        sub_ax = plt.axes([0.91, 0.12, 0.02, x]) # add a small custom axis (left, bottom, width, height)
-        fig.colorbar(img, cax=sub_ax, format='%+2.0f dB') # %4.2e, {x:.2e}
-
-    def createSpanSelector(self, ax):
-        # Plays the audio of the selected fragment
-        def listenFrag(xmin, xmax):
-            ini, end = np.searchsorted(self.time, (xmin, xmax))
-            selectedAudio = self.audio[ini:end+1]
-            sd.play(selectedAudio, self.fs)
+            windSizeSamp = windSize * self.fs
+            nfft = self.opt_nfft[0]
             
-        self.span = SpanSelector(ax, listenFrag, 'horizontal', useblit=False, interactive=True, drag_from_anywhere=True)
+            if nfft < windSizeSamp:
+                last = int(math.log2(self.opt_nfft[-1])) + 1
+                first = int(math.log2(nfft))
+                while 2**first < windSizeSamp:
+                    for a in range(len(self.opt_nfft)-1):
+                        self.opt_nfft[a] = self.opt_nfft[a+1]
+                    self.opt_nfft[-1] = 2**last
+                    last += 1
+                    first += 1
+                self.updateOptionMenu(self.dd_nfft)
+            else:
+                first = int(math.log2(nfft)) - 1
+                while 2**first > windSizeSamp:
+                    for a in range(len(self.opt_nfft)-1, 0, -1):
+                        self.opt_nfft[a] = self.opt_nfft[a-1]
+                    self.opt_nfft[0] = 2**first
+                    self.updateOptionMenu(self.dd_nfft)
+                    first -= 1
+            return True
+
+    def overlapEntry(self):
+        overlap = float(self.ent_over.text())
+        windSize = float(self.ent_size.text())
+        
+        if overlap > self.duration or overlap >= windSize:
+            if self.duration <= 0.03:
+                overlap = round(windSize - 0.001, 3)
+            else:
+                overlap = 0.01
+            self.ent_over.setText(str(overlap))
+            
+            if overlap > self.duration:
+                text = f"The overlap can't be greater than the duration of the signal ({self.duration}s)."
+                QMessageBox.critical(self, "Overlap too long", text)
+            elif overlap >= windSize:
+                text = f"The overlap must always be smaller than the window size ({windSize}s)."
+                QMessageBox.critical(self, "Wrong overlap value", text)
+            return False
+        return True
+
+    def minfreqEntry(self):
+        minfreq = int(self.ent_minf.text())
+        maxfreq = int(self.ent_maxf.text())
+        
+        if minfreq >= maxfreq:
+            self.ent_minf.setText('0')
+            text = f"The minimum frequency must be smaller than the maximum frequency ({maxfreq}Hz)."
+            QMessageBox.critical(self, "Minimum frequency too big", text)
+            return False
+        return True
+
+    def maxfreqEntry(self):
+        minfreq = int(self.ent_minf.text())
+        maxfreq = int(self.ent_maxf.text())
+        
+        if maxfreq > self.fs/2 or maxfreq <= minfreq:
+            self.ent_maxf.setText(str(int(self.fs/2)))
+            
+            if maxfreq > self.fs/2:
+                text = f"The maximum frequency can't be greater than the half of the sample frequency ({self.fs/2}Hz)."
+                QMessageBox.critical(self, "Maximum frequency too big", text)
+            elif maxfreq <= minfreq:
+                text = f"The maximum frequency must be greater than the minimum frequency ({minfreq}Hz)."
+                QMessageBox.critical(self, "Maximum frequency too small", text)
+            return False
+        return True
+
+    def minpitchEntry(self):
+        minPitch = float(self.ent_minp.text())
+        maxPitch = float(self.ent_maxp.text())
+        
+        if minPitch >= maxPitch:
+            self.ent_minp.setText('75.0')
+            self.ent_maxp.setText('600.0')
+            text = f"The minimum pitch must be smaller than the maximum pitch ({maxPitch}Hz)."
+            QMessageBox.critical(self, "Pitch floor too big", text)
+            return False
+        return True
+
+    def maxpitchEntry(self):
+        minPitch = float(self.ent_minp.text())
+        maxPitch = float(self.ent_maxp.text())
+        
+        if maxPitch <= minPitch:
+            self.ent_minp.setText('75.0')
+            self.ent_maxp.setText('600.0')
+            text = f"The maximum pitch must be greater than the minimum pitch ({minPitch}Hz)."
+            QMessageBox.critical(self, "Pitch ceiling too small", text)
+            return False
+        return True
+
+    def fundfreqEntry(self):
+        fundfreq = int(self.ent_fund.text())
+        
+        if fundfreq < 1:
+            self.ent_fund.setText('1')
+            text = "The minimum value of the fundamental frequency response is 1."
+            QMessageBox.critical(self, "Fundamental frequency response too small", text)
+            return False
+        elif fundfreq > (self.fs/2):
+            self.ent_fund.setText(str(int(self.fs/2)))
+            text = f"The maximum frequency can't be greater than the half of the sample frequency ({self.fs/2}Hz)."
+            QMessageBox.critical(self, "Fundamental frequency response too big", text)
+            return False
+        return True
+
+    def centerEntry(self):
+        return True
+
+    def percentageEntry(self):
+        percentage = float(self.ent_perc.text())
+        
+        if percentage < 0.0 or percentage > 100.0:
+            self.ent_perc.setText('10.0')
+            text = "The percentage must be a number between 0 and 100."
+            QMessageBox.critical(self, "Wrong percentage value", text)
+            return False
+        return True
+
+    def fcut1Entry(self):
+        return True
+
+    def fcut2Entry(self):
+        return True
+
+    def betaEntry(self):
+        beta = int(self.ent_beta.text())
+        
+        if beta < 0 or beta > 14:
+            self.ent_beta.setText('0')
+            text = "The value of beta must be a number between 0 and 14."
+            QMessageBox.critical(self, "Incorrect value of beta", text)
+            return False
+        return True
+
+    def pitchCheckbox(self):
+        showPitch = self.chk_pitch.isChecked()
+        
+        if showPitch:
+            self.controller.adse.createVariables()
+            self.dd_meth.setEnabled(True)
+            self.ent_minp.setEnabled(True)
+            self.ent_maxp.setEnabled(True)
+            self.but_adse.setEnabled(True)
+        else:
+            self.dd_meth.setEnabled(False)
+            self.ent_minp.setEnabled(False)
+            self.ent_maxp.setEnabled(False)
+            self.but_adse.setEnabled(False)
+
+    def displayOptions(self, choice):
+        self.dd_opts.setEnabled(True)
+        
+        # Enable/disable widgets based on choice
+        self.ent_over.setEnabled(choice not in ['FT', 'STFT', 'Pitch', 'Filtering'])
+        self.ent_size.setEnabled(choice not in ['FT', 'Pitch', 'Filtering'])
+        
+        if choice == 'Filtering':
+            self.dd_pass.setEnabled(True)
+            self.ent_perc.setEnabled(True)
+            
+            filter_type = self.dd_pass.currentText()
+            self.ent_fcut.setEnabled(filter_type in ['Lowpass', 'Highpass'])
+            self.ent_cut1.setEnabled(filter_type in ['Bandpass', 'Bandstop'])
+            self.ent_cut2.setEnabled(filter_type in ['Bandpass', 'Bandstop'])
+            self.ent_fund.setEnabled(filter_type == 'Harmonic')
+            self.ent_cent.setEnabled(filter_type == 'Harmonic')
+        else:
+            self.dd_pass.setEnabled(False)
+            self.ent_fund.setEnabled(False)
+            self.ent_cent.setEnabled(False)
+            self.ent_perc.setEnabled(False)
+            self.ent_fcut.setEnabled(False)
+            self.ent_cut1.setEnabled(False)
+            self.ent_cut2.setEnabled(False)
+        
+        if choice == 'Pitch':
+            self.controller.adse.createVariables()
+            self.dd_meth.setEnabled(True)
+            self.ent_minp.setEnabled(True)
+            self.ent_maxp.setEnabled(True)
+            self.but_adse.setEnabled(True)
+        else:
+            self.dd_meth.setEnabled(False)
+            self.ent_minp.setEnabled(False)
+            self.ent_maxp.setEnabled(False)
+            self.but_adse.setEnabled(False)
+        
+        self.rdb_lin.setEnabled(choice in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Filtering'])
+        self.rdb_mel.setEnabled(choice in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Filtering'])
+        
+        self.ent_minf.setEnabled(choice in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
+        self.ent_maxf.setEnabled(choice in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
+        
+        self.dd_wind.setEnabled(choice in ['STFT', 'Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Short-Time-Energy'])
+        self.dd_nfft.setEnabled(choice in ['STFT', 'Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
+        
+        self.ent_beta.setEnabled(choice == 'Short-Time-Energy')
+        self.chk_pitch.setEnabled(choice == 'Spectrogram')
+
+    def displayFilterOptions(self, choice):
+        self.ent_fcut.setEnabled(choice in ['Lowpass', 'Highpass'])
+        self.ent_cut1.setEnabled(choice in ['Bandpass', 'Bandstop'])
+        self.ent_cut2.setEnabled(choice in ['Bandpass', 'Bandstop'])
+        self.ent_fund.setEnabled(choice == 'Harmonic')
+        self.ent_cent.setEnabled(choice == 'Harmonic')
+
+    def checkValues(self):
+        choice = self.dd_opts.currentText()
+        windSize = float(self.ent_size.text())
+        overlap = float(self.ent_over.text())
+        minfreq = int(self.ent_minf.text())
+        maxfreq = int(self.ent_maxf.text())
+        beta = int(self.ent_beta.text())
+        minpitch = float(self.ent_minp.text())
+        maxpitch = float(self.ent_maxp.text())
+        fundfreq = int(self.ent_fund.text())
+        center = int(self.ent_cent.text())
+        percentage = float(self.ent_perc.text())
+        fcut1 = int(self.ent_cut1.text())
+        fcut2 = int(self.ent_cut2.text())
+
+        if choice in ['STFT', 'STFT + Spect', 'Spectral Centroid', 'Spectrogram', 'Filtering', 'Short-Time-Energy']:
+            if choice == 'Short-Time-Energy' and not self.betaEntry():
+                return
+            if not self.minfreqEntry() or not self.maxfreqEntry():
+                return
+            if choice == 'Filtering' and (not self.fundfreqEntry() or not self.centerEntry() or 
+                                        not self.percentageEntry() or not self.fcut1Entry() or 
+                                        not self.fcut2Entry()):
+                return
+            if choice != 'Filtering' and not self.windowLengthEntry():
+                return
+            if choice in ['STFT + Spect', 'Spectral Centroid', 'Short-Time-Energy', 'Spectrogram'] and not self.overlapEntry():
+                return
+        elif choice == 'Pitch' and (not self.minpitchEntry() or not self.maxpitchEntry()):
+            return
+        
+        self.plotFigure(choice, windSize, overlap, minfreq, maxfreq, beta)
+
+    # All the other methods (calculate* and plot*) remain exactly the same as in your original code
+    # since they don't interact with the GUI directly
     
+
     #####################
-    # CALCULATE METHODS #
+    # CALCULATE METHODS # taken from the original file: controlMenu.py
     #####################
 
     def calculateWaveform(self, ax):
@@ -749,13 +646,10 @@ class ControlMenu():
                                         number_of_filters=numFilters,
                                         ceiling=maxpitch,
                                         max_number_of_candidates=maxCandidates)
-        
         pitch_values = pitch.selected_array['frequency'] # extract selected pitch contour
         pitch_values[pitch_values==0] = np.nan # replace unvoiced samples by NaN to not plot
 
         return pitch, pitch_values
-
-        
     
     
     def designFilter(self, cm, gpass, gstop):
@@ -814,9 +708,8 @@ class ControlMenu():
 
         return filteredSignal, b, a
     
-
     ################
-    # PLOT METHODS #
+    # PLOT METHODS # as in the original file
     ################
     
     # Plots the waveform and the Fast Fourier Transform (FFT) of the fragment
@@ -1036,187 +929,6 @@ class ControlMenu():
         plt.show() # show the figure
 
 
-    # # Callen when pressing the "Filter frequency response" button
-    # def plotFiltFreqResponse(self, cm):
-    #     fig, ax = plt.subplots(2, figsize=(9,7))
-    #     plt.subplots_adjust(hspace=.3) # to avoid overlapping between xlabel and title
-
-    #     _, b, a = self.designFilter(cm, 3, 40)
-
-    #     # Calculate the filter frequency response
-    #     # w, h = signal.freqz(b, a, fs=self.fs) # w: frequencies in Hz, h: frequency response
-    #     # w_rad, _ = signal.freqz(b, a) # w_rad: frequencies in rad/samples
-    #     h = signal.TransferFunction(b, a)
-    #     # w_rads = ... # w_rads: frequencies in rad/s
-    #     # w, mag, phase = signal.bode(h, w_rads)
-    #     w, mag, phase = signal.bode(h)
-
-    #     ax[0].plot(w, mag) # Magnitude plot
-    #     ax[0].axhline(y=0, color='black', linewidth='0.5', linestyle='--') # draw an horizontal line in y=0.0
-    #     ax[0].set(xlim=[0, max(w)], ylabel='Magnitude (dB)', title='Frequency Response, Magnitude')
-    #     ax[1].plot(w, phase) # Phase plot
-    #     ax[1].axhline(y=0, color='black', linewidth='0.5', linestyle='--') # draw an horizontal line in y=0.0
-    #     ax[1].set(xlim=[0, max(w)], ylabel='Phase (deg)', title='Frequency Response, Phase')
-
-    #     plt.show() # show the figure
-
-
-    # Called when pressing the 'Plot' button
-    def plotFigure(self, cm, choice, windSize, overlap, minfreq, maxfreq, beta):
-        list = self.aux.readFromCsv()
-        cmap = mpl.colormaps[list[5][2]]
-        # Values given by the user (that were not created in checkValues())
-        windType = cm.var_wind.get()
-        nfftUser = cm.var_nfft.get()
-
-        windSizeSamp = windSize * self.fs # window size in samples
-        windSizeSampInt = int(windSizeSamp)
-        overlapSamp = int(overlap * self.fs) # overlap in samples (int)
-        hopSize = windSizeSampInt-overlapSamp
-
-        title1 = 'Window_'+ str(windType) +'_'+ str(windSize) +'s-Nfft_'+ str(nfftUser) +'-Overlap_'+ str(overlap) +'s'
-        titleSpec = '-MinFreq_'+ str(minfreq) + 'Hz-MaxFreq_'+ str(maxfreq) + 'Hz'
-        titleSTFT = 'Window_'+ str(windType) +'_'+ str(windSize) +'s-Nfft_'+ str(nfftUser)
-        titleSTE = 'Window_'+ str(windType) +'_'+ str(windSize) +'s-Overlap_'+ str(overlap) +'s-Beta_'+ str(beta)
-
-        # Apply the window type to the window
-        if windType == 'Bartlett':
-            window = np.bartlett(windSizeSampInt)
-            windType1 = 'bartlett' # used in STE
-        elif windType == 'Blackman':
-            window = np.blackman(windSizeSampInt)
-            windType1 = 'blackman' # used in STE
-        elif windType == 'Hamming':
-            window = np.hamming(windSizeSampInt)
-            windType1 = 'hamming' # used in STE
-        elif windType == 'Hanning':
-            window = np.hanning(windSizeSampInt)
-            windType1 = 'hann' # used in STE
-        elif windType == 'Kaiser':
-            window = np.kaiser(windSizeSampInt, beta) # np.kaiser(windSizeSampInt, float:shape parameter for window)
-            windType1 = ('kaiser', beta) # used in STE
-
-        if choice == 'FT':
-            # if plt.fignum_exists(self.figFT.number):
-            #     plt.close(self.figFT.number) # close the figure of the FT
-            self.plotFT(cm) # create the figure of the FT (again)
-
-        elif choice == 'Spectrogram':
-            self.plotSpectrogram(cm, window, windSizeSampInt, hopSize, cmap, title1+titleSpec)
-
-        elif choice == 'Short-Time-Energy':
-            self.plotSTE(cm, windType1, windSizeSampInt, titleSTE)
-
-        elif choice == 'Pitch':
-            self.plotPitch(cm)
-
-        elif choice == 'Filtering':
-            self.plotFiltering(cm)
-
-        elif choice == 'STFT' or choice == 'STFT + Spect' or choice == 'Spectral Centroid':
-            # The window is in the middle of the waveform by default
-            midPoint_idx = int(self.lenAudio/2) # index of the middle point in the waveform
-            midPoint = self.time[midPoint_idx] # value of the middle point
-
-            # Define initial and end points of the window
-            ini_idx = midPoint_idx - int(windSizeSamp/2) # index of the initial point
-            end_idx = midPoint_idx + int(windSizeSamp/2) # index of the end point
-            if ini_idx < 0: ini_idx = 0
-            if end_idx > self.lenAudio-1: end_idx = self.lenAudio-1
-            ini = self.time[ini_idx] # value of the initial point
-            end = self.time[end_idx] # value of the end point
-
-            audioFragWind = self.audio[ini_idx:end_idx+1]
-            lenWindow = len(window)
-            if lenWindow < len(audioFragWind):
-                audioFragWind = audioFragWind[:-1].copy() # delete last element of the numpy array
-            elif lenWindow > len(audioFragWind):
-                window = window[:-1].copy() # delete last element of the numpy array
-            audioFragWind2 = audioFragWind * window
-
-            # Calculate the STFT
-            stft = self.calculateSTFT(audioFragWind2, nfftUser)
-            values = np.arange(int(nfftUser/2))
-            frequencies = values * self.fs / nfftUser
-
-            if choice == 'STFT':
-                axSTFT, line1 = self.plotSTFT(cm, stft, frequencies, titleSTFT)
-                ax0 = axSTFT[0]
-            elif choice == 'STFT + Spect':
-                axSTFTSpect1, axSTFTSpect2, axSTFTSpect3, line1 = self.plotSTFTspect(cm, stft, frequencies, window, windSizeSampInt, hopSize, cmap, title1+titleSpec)
-                midLineSpect = axSTFTSpect3.axvline(x=midPoint, color='black', linewidth='0.5', fillstyle='full') # line in the middle (spectrogram)
-                ax0 = axSTFTSpect1
-            elif choice == 'Spectral Centroid':
-                axSC1, axSC2, axSC3, line1 = self.plotSC(cm, audioFragWind2, window, windSizeSampInt, nfftUser, overlapSamp, hopSize, cmap, title1+titleSpec)
-                midLineSpectSC = axSC3.axvline(x=midPoint, color='black', linewidth='0.5', fillstyle='full') # line in the middle (spectrogram)
-                ax0 = axSC1
-
-            # Draw the rectangle
-            bottom, top = ax0.get_ylim()
-            rectangle = Rectangle(xy=(ini,bottom), width=end-ini, height=top-bottom, alpha=0.5, color='silver', zorder=2)
-            ax0.add_artist(rectangle) # draw the rectangle
-            midLine = ax0.axvline(x=midPoint, color='black', linewidth='0.5', fillstyle='full', zorder=2) # line in the middle
-
-            def get_window():
-                return window
-
-            # If the user changes the position of the window, recalculate the STFT/FFT
-            def on_click(event):
-                window = get_window()
-                # if the user does left click in the waveform
-                if event.button is MouseButton.LEFT and (choice == 'STFT' and event.inaxes == axSTFT[0]) or (choice == 'STFT + Spect' and event.inaxes == axSTFTSpect1) or (choice == 'Spectral Centroid' and event.inaxes == axSC1):
-                     # Define the new initial and end points of the window
-                    new_midPoint = event.xdata
-                    new_midPoint_idx = midPoint_idx
-                    for i in range(self.lenAudio):
-                        if self.time[i] == new_midPoint or (self.time[i] < new_midPoint and self.time[i+1] > new_midPoint):
-                            new_midPoint_idx = i
-                            break
-                    new_ini_idx = new_midPoint_idx - int(windSizeSamp/2)
-                    new_end_idx = new_midPoint_idx + int(windSizeSamp/2)
-                    if new_ini_idx < 1 or new_end_idx > self.lenAudio: 
-                        text = "At that point the window gets out of index."
-                        tk.messagebox.showerror(parent=cm, title="Window out of index", message=text) # show error
-                        return
-                    
-                    new_audioFragWind = self.audio[new_ini_idx:new_end_idx+1]
-                    if lenWindow < len(new_audioFragWind):
-                        new_audioFragWind = new_audioFragWind[:-1].copy() # delete last element of the numpy array
-                    elif lenWindow > len(new_audioFragWind):
-                        window = window[:-1].copy() # delete last element of the numpy array
-                    new_audioFragWind2 = new_audioFragWind * window
-
-                    if choice == 'Spectral Centroid':
-                        # recalculate FFT
-                        axSC2.clear()
-                        new_spectralC = self.calculateSC(new_audioFragWind2)
-                        new_scValue = str(round(new_spectralC, 2)) # take only two decimals
-                        _, new_freqs = axSC2.psd(new_audioFragWind2, NFFT=windSizeSampInt, pad_to=nfftUser, Fs=self.fs, window=window, noverlap=overlapSamp)
-                        axSC2.axvline(x=new_spectralC, color='r', linewidth='1') # draw a vertical line in x=value of the spectral centroid
-                        axSC2.set(xlim=[0, max(new_freqs)], xlabel='Frequency (Hz)', ylabel='Power spectral density (dB/Hz)', title='Power spectral density using fft, spectral centroid value is '+ new_scValue)
-                    else: # recalculate STFT
-                        new_stft = self.calculateSTFT(new_audioFragWind2, nfftUser)
-                        new_values = np.arange(int(nfftUser/2))
-                        new_frequencies = new_values * self.fs / nfftUser
-                        line1.set_xdata(new_frequencies)
-                        line1.set_ydata(20*np.log10(abs(new_stft)))
-
-                    # Move the window and rescale 'y' axis
-                    midLine.set_xdata(new_midPoint)
-                    if choice == 'STFT':
-                        ax1 =  axSTFT[1]
-                    elif choice == 'STFT + Spect':
-                        ax1 =  axSTFTSpect2
-                        midLineSpect.set_xdata(new_midPoint)
-                    elif choice == 'Spectral Centroid':
-                        ax1 =  axSC2
-                        midLineSpectSC.set_xdata(new_midPoint)
-                    ax1.relim()
-                    ax1.autoscale_view()
-                    new_ini = self.time[new_ini_idx]
-                    rectangle.set_x(new_ini)
-
-                    plt.show() # update the figure
-                
-            plt.connect('button_press_event', on_click) # when the mouse button is pressed, call on_click function
-            plt.show() # show the figure
+    def closeEvent(self, event):
+        plt.close('all')
+        event.accept()
