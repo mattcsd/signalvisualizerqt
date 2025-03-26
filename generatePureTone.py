@@ -14,12 +14,11 @@ from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 
 class PureTone(QDialog):
+
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
         self.selectedAudio = np.empty(1)
-        
-        # Default values
         self.default_values = {
             'duration': 1.0,
             'amplitude': 0.5,
@@ -28,46 +27,48 @@ class PureTone(QDialog):
             'frequency': 440,
             'phase': 0.0
         }
-        
-        # Initialize ControlMenu reference (will be created properly when needed)
-        self.cm = None
+        self.sliders = {}
         
         self.setupUI()
         self.plotPureTone()
-        self.setupAudioInteractions()  # Add this line
+        self.setupAudioInteractions()  # Add this line to initialize audio interactions
 
     def setupUI(self):
-        self.setWindowTitle('Generate Pure Tone')
-        self.resize(900, 600)
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Create main figure
-        self.fig = plt.figure(figsize=(8, 4), tight_layout=True)
+        # Math display with fallback font
+        self.math_display = QLabel()
+        self.math_display.setAlignment(Qt.AlignCenter)
+        self.math_display.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-family: "Times New Roman", serif;  /* Fallback for Cambria */
+                color: #0066cc;
+                background-color: #f0f8ff;
+                border: 1px solid #c0c0c0;
+                border-radius: 5px;
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+        """)
+        main_layout.addWidget(self.math_display)
+        
+        # Figure setup
+        self.fig = plt.figure(figsize=(8, 4))
         self.ax = self.fig.add_subplot(111)
-        self.fig.subplots_adjust(left=0.1, right=0.95, bottom=0.15, top=0.95)
-        
-        # Create canvas and toolbar
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
         
-        # Main layout
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(8)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Add figure and controls
-        main_layout.addWidget(self.canvas, stretch=1)
         main_layout.addWidget(self.toolbar)
+        main_layout.addWidget(self.canvas)
         main_layout.addLayout(self.create_controls())
         
         self.setLayout(main_layout)
-
-    '''* Audio playing functions *'''
+        self.update_expression()
 
     def setupAudioInteractions(self):
-        """Setup click-to-play and region selection functionality"""
-        # Click-to-play full tone
-        # self.canvas.mpl_connect('button_press_event', self.on_click_play)
-        
+        """Setup audio playback interactions"""
         # Region selection
         self.span = SpanSelector(
             self.ax,
@@ -77,12 +78,18 @@ class PureTone(QDialog):
             interactive=True,
             drag_from_anywhere=True
         )
+        
+        # Ensure the span selector stays active
+        self.span.set_active(True)
 
     def on_select_region(self, xmin, xmax):
         """Play selected region of the tone"""
+        if len(self.selectedAudio) <= 1:  # No audio generated yet
+            return
+            
         fs = self.default_values['fs']
-        time = np.linspace(0, self.sliders['Duration (s)'].value()/100, 
-                          len(self.selectedAudio), endpoint=False)
+        duration = self.sliders['Duration (s)'].value() / 100
+        time = np.linspace(0, duration, len(self.selectedAudio), endpoint=False)
         
         # Find indices for selected region
         idx_min = np.argmax(time >= xmin)
@@ -97,14 +104,12 @@ class PureTone(QDialog):
         layout.setVerticalSpacing(8)
         layout.setHorizontalSpacing(10)
         
-        # Create sliders
-        self.sliders = {
-            'Duration (s)': self.create_slider(0.01, 30.0, self.default_values['duration']),
-            'Offset': self.create_slider(-1.0, 1.0, self.default_values['offset']),
-            'Amplitude': self.create_slider(0.0, 1.0, self.default_values['amplitude']),
-            'Frequency (Hz)': self.create_slider(0, 20000, self.default_values['frequency'], is_float=False),
-            'Phase (π rad)': self.create_slider(-1.0, 1.0, self.default_values['phase'])
-        }
+        # Create and store sliders
+        self.sliders['Duration (s)'] = self.create_slider(0.01, 30.0, self.default_values['duration'])
+        self.sliders['Offset'] = self.create_slider(-1.0, 1.0, self.default_values['offset'])
+        self.sliders['Amplitude'] = self.create_slider(0.0, 1.0, self.default_values['amplitude'])
+        self.sliders['Frequency (Hz)'] = self.create_slider(0, 20000, self.default_values['frequency'], is_float=False)
+        self.sliders['Phase (π rad)'] = self.create_slider(-1.0, 1.0, self.default_values['phase'])
         
         # Add to layout
         for i, (label, slider) in enumerate(self.sliders.items()):
@@ -112,15 +117,98 @@ class PureTone(QDialog):
             layout.addWidget(slider, i, 1, 1, 2)
             layout.addWidget(self.create_value_display(slider, label.endswith('Hz)')), i, 3)
         
-        # Buttons
+        # Buttons layout
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(QPushButton('Save', clicked=self.saveDefaults))
         btn_layout.addWidget(QPushButton('Plot', clicked=self.plotPureTone))
-        btn_layout.addWidget(QPushButton('Help', clicked=self.showHelp))
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(QPushButton('Default Values', clicked=self.reset_to_defaults))
+        btn_layout.addWidget(QPushButton('🛈 Help', clicked=self.showHelp))
         
         layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
         
         return layout
+
+    def update_expression(self):
+        """Update the mathematical expression display"""
+        if not hasattr(self, 'sliders') or not self.sliders:
+            return  # Safety check
+            
+        pi = "π"
+        expression = (
+            f"<div style='text-align: center;'>"
+            f"<span style='font-size: 22px;'>y(t) = {self.sliders['Offset'].value()/100:.2f} + </span>"
+            f"<span style='font-size: 24px; color: #d63333;'>{self.sliders['Amplitude'].value()/100:.2f}</span>"
+            f"<span style='font-size: 22px;'>·cos( 2{pi}·</span>"
+            f"<span style='font-size: 24px; color: #338033;'>{self.sliders['Frequency (Hz)'].value()}</span>"
+            f"<span style='font-size: 22px;'>·t + </span>"
+            f"<span style='font-size: 24px; color: #9933cc;'>{self.sliders['Phase (π rad)'].value()/100:.2f}{pi} )</span>"
+            f"</div>"
+        )
+        self.math_display.setText(expression)
+
+
+    def plotPureTone(self):
+        """Generate and plot the pure tone"""
+        self.ax.clear()
+        
+        # Get parameters
+        duration = self.sliders['Duration (s)'].value() / 100
+        amplitude = self.sliders['Amplitude'].value() / 100
+        frequency = self.sliders['Frequency (Hz)'].value()
+        phase = self.sliders['Phase (π rad)'].value() / 100
+        offset = self.sliders['Offset'].value() / 100
+        fs = self.default_values['fs']
+        
+        # Generate signal
+        samples = int(duration * fs)
+        time = np.linspace(0, duration, samples, endpoint=False)
+        self.selectedAudio = amplitude * np.cos(2*np.pi*frequency*time + phase*np.pi) + offset
+        
+        # Plot
+        self.ax.plot(time, self.selectedAudio, linewidth=1.5, color='blue')
+        self.ax.set(xlim=[0, duration], 
+                   ylim=[-1.1, 1.1],  # Fixed y-limits for audio signals
+                   xlabel='Time (s)', 
+                   ylabel='Amplitude')
+        self.ax.grid(True, linestyle=':', alpha=0.5)
+        
+        # Redraw canvas and update expression
+        self.canvas.draw()
+        self.update_expression()
+        
+        # Reinitialize span selector after new plot
+        self.setupAudioInteractions()
+
+
+
+
+
+
+    ''' Audio playing functions '''
+
+    def reset_to_defaults(self):
+        """Reset all controls to default values"""
+        # Reset sliders
+        self.sliders['Duration (s)'].setValue(int(self.default_values['duration'] * 100))
+        self.sliders['Offset'].setValue(int(self.default_values['offset'] * 100))
+        self.sliders['Amplitude'].setValue(int(self.default_values['amplitude'] * 100))
+        self.sliders['Frequency (Hz)'].setValue(self.default_values['frequency'])
+        self.sliders['Phase (π rad)'].setValue(int(self.default_values['phase'] * 100))
+        
+        # Update the display values
+        for label, slider in self.sliders.items():
+            display = slider.property('display_widget')
+            if display:
+                if label.endswith('Hz)'):
+                    display.setText(str(slider.value()))
+                else:
+                    display.setText(f"{slider.value()/100:.2f}")
+
+        self.update_expression()  # Update the math display after reset
+        
+        # Update the plot
+        self.plotPureTone()
 
     def create_slider(self, min_val, max_val, init_val, is_float=True):
         slider = QSlider(Qt.Horizontal)
@@ -138,43 +226,6 @@ class PureTone(QDialog):
     def update_plot(self):
         self.plotPureTone()
 
-    def plotPureTone(self):
-        self.ax.clear()
-        
-        # Get parameters
-        duration = self.sliders['Duration (s)'].value() / 100
-        amplitude = self.sliders['Amplitude'].value() / 100
-        frequency = self.sliders['Frequency (Hz)'].value()
-        phase = self.sliders['Phase (π rad)'].value() / 100
-        offset = self.sliders['Offset'].value() / 100
-        fs = self.default_values['fs']
-        
-        # Generate and store signal
-        samples = int(duration * fs)
-        time = np.linspace(0, duration, samples, endpoint=False)
-        self.selectedAudio = amplitude * np.cos(2*np.pi*frequency*time + phase*np.pi) + offset
-        
-        # Plot
-        self.ax.plot(time, self.selectedAudio, linewidth=1.5, color='blue')
-
-        # Set axes limits
-        y_margin = max(0.1, amplitude * 0.2)
-        self.ax.set_ylim(-amplitude-y_margin, amplitude+y_margin)
-        self.ax.set_xlim(0, duration)
-        
-        # Add reference lines
-        self.ax.axhline(0, color='black', linestyle=':', alpha=0.5)
-        self.ax.axhline(1.0, color='red', linestyle='--', alpha=0.3)
-        self.ax.axhline(-1.0, color='red', linestyle='--', alpha=0.3)
-        self.ax.axhline(offset, color='green', linestyle='-.', alpha=0.5)
-        
-        # Configure grid and labels
-        self.ax.grid(True, linestyle=':', alpha=0.5)
-        self.ax.set_xlabel('Time (s)', fontsize=9)
-        self.ax.set_ylabel('Amplitude', fontsize=9)
-        
-        # Redraw canvas
-        self.canvas.draw()
 
     def saveDefaults(self):
         # Implement your save functionality here
