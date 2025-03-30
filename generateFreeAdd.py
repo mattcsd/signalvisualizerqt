@@ -6,9 +6,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.widgets import SpanSelector, Button
 
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                            QLabel, QSlider, QSpinBox, QPushButton, QDialog, QGridLayout,
-                            QMessageBox)
+from PyQt5.QtWidgets import (
+    QApplication, QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QSlider, QSpinBox, QPushButton, QGroupBox,  # Added QGroupBox here
+    QMessageBox
+)
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QIcon
 
@@ -54,36 +56,45 @@ class FreeAdditionPureTones(QDialog):
         self.plotFAPT()
 
     def initUI(self):
-        self.setWindowTitle('Free addition of pure tones')
-        self.setWindowIcon(QIcon('icons/icon.ico'))
-        
+        # Main layout
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Frequency controls
-        freq_layout = QHBoxLayout()
-        freq_layout.addWidget(QLabel('Frequency (Hz)'))
+        # Control panel
+        control_panel = QGroupBox("Tone Controls")
+        control_layout = QGridLayout()
+        control_panel.setLayout(control_layout)
         
+        # Compact controls layout
         for i in range(6):
+            # Frequency controls
+            control_layout.addWidget(QLabel(f"Frq{i+1}"), 0, i*2)
             sb = QSpinBox()
             sb.setRange(0, 24000)
             sb.setValue(float(self.default_values[6+i*2]))
+            sb.setMaximumWidth(80)
             self.freq_spinboxes.append(sb)
-            freq_layout.addWidget(sb)
-        
-        # Amplitude sliders
-        amp_layout = QHBoxLayout()
-        amp_layout.addWidget(QLabel('Amplitude'))
-        
-        for i in range(6):
-            slider = QSlider(Qt.Vertical)
+            control_layout.addWidget(sb, 1, i*2)
+            
+            # Amplitude controls
+            control_layout.addWidget(QLabel(f"Amp{i+1}"), 0, i*2+1)
+            slider = QSlider(Qt.Horizontal)
             slider.setRange(0, 100)
             slider.setValue(int(float(self.default_values[18+i*2]) * 100))
+            slider.setMaximumWidth(100)
             self.amp_sliders.append(slider)
-            amp_layout.addWidget(slider)
-        
-        # Duration controls
+            control_layout.addWidget(slider, 1, i*2+1)
+            
+            # Value display
+            value_label = QLabel(f"{slider.value()/100:.2f}")
+            value_label.setAlignment(Qt.AlignCenter)
+            value_label.setMaximumWidth(40)
+            slider.valueChanged.connect(lambda v, lbl=value_label: lbl.setText(f"{v/100:.2f}"))
+            control_layout.addWidget(value_label, 2, i*2+1)
+
+        # Duration row
         dur_layout = QHBoxLayout()
-        dur_layout.addWidget(QLabel('Duration (s)'))
+        dur_layout.addWidget(QLabel('Duration (s):'))
         
         self.dur_slider = QSlider(Qt.Horizontal)
         self.dur_slider.setRange(1, 3000)
@@ -93,58 +104,38 @@ class FreeAdditionPureTones(QDialog):
         self.dur_spinbox = QSpinBox()
         self.dur_spinbox.setRange(1, 3000)
         self.dur_spinbox.setValue(int(float(self.default_values[2]) * 100))
+        self.dur_spinbox.setMaximumWidth(80)
         dur_layout.addWidget(self.dur_spinbox)
-        
-        # Connect signals
-        self.dur_slider.valueChanged.connect(self.dur_spinbox.setValue)
-        self.dur_spinbox.valueChanged.connect(self.dur_slider.setValue)
-        self.dur_slider.valueChanged.connect(self.plotFAPT)
-        
-        # Octave controls
-        octave_layout = QHBoxLayout()
-        octave_layout.addWidget(QLabel('Octave'))
-        
-        self.octave_spinbox = QSpinBox()
-        self.octave_spinbox.setRange(1, 6)
-        self.octave_spinbox.setValue(int(self.default_values[4]))
-        octave_layout.addWidget(self.octave_spinbox)
         
         # Buttons
         btn_layout = QHBoxLayout()
+        buttons = [
+            ('Plot', self.plotFAPT),
+            ('Piano', self.togglePiano),
+            ('Save', self.saveDefaultValues),
+            ('🛈 Help', self.showHelp)
+        ]
         
-        self.plot_btn = QPushButton('Plot')
-        self.plot_btn.clicked.connect(self.plotFAPT)
+        for text, callback in buttons:
+            btn = QPushButton(text)
+            btn.clicked.connect(callback)
+            btn.setMaximumWidth(80)
+            btn_layout.addWidget(btn)
         
-        self.piano_btn = QPushButton('Show piano')
-        self.piano_btn.clicked.connect(self.togglePiano)
-        
-        self.save_btn = QPushButton('Save')
-        self.save_btn.clicked.connect(self.saveDefaultValues)
-        
-        # Fixed Help Button Implementation
-        self.help_btn = QPushButton('🛈 Help')
-        self.help_btn.clicked.connect(self.showHelp)
-        
-        btn_layout.addWidget(self.plot_btn)
-        btn_layout.addWidget(self.piano_btn)
-        btn_layout.addWidget(self.save_btn)
-        btn_layout.addWidget(self.help_btn)
+        # Add to main layout
+        main_layout.addWidget(control_panel)
+        main_layout.addLayout(dur_layout)
+        main_layout.addLayout(btn_layout)
         
         # Matplotlib figure
-        self.fig, self.ax = plt.subplots()
+        self.fig, self.ax = plt.subplots(figsize=(8, 4))
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
         
-        main_layout.addLayout(freq_layout)
-        main_layout.addLayout(amp_layout)
-        main_layout.addLayout(dur_layout)
-        main_layout.addLayout(octave_layout)
-        main_layout.addLayout(btn_layout)
         main_layout.addWidget(self.toolbar)
         main_layout.addWidget(self.canvas)
         
         self.setLayout(main_layout)
-
     def showHelp(self):
         """Show help window for this module"""
         if hasattr(self, 'help') and self.help:
@@ -216,7 +207,6 @@ class FreeAdditionPureTones(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Could not save values: {str(e)}")
     
-
     def showPiano(self):
         self.piano = QDialog(self)
         self.piano.setWindowTitle("Piano Keyboard")
