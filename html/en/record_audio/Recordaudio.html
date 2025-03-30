@@ -3,7 +3,7 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="utf-8" />
-    <title>Load audio file</title>
+    <title>Record audio</title>
     <style>
         body {
             background-color: #ffffff;
@@ -63,22 +63,21 @@
     </style>
 </head>
 <body>
-    <h1>Load audio file</h1>
-
+    <h1>Record audio</h1>
     <p>
-        This module allows to load an audio file for analysis.
+        This module allows to record up to 60 minutes of audio for analysis.
     </p>
     <h2>Interface</h2>
-    <img alt="Load audio file interface" src="html/en/Load audio file/images/load.png" style="width: 702.00px; height: 305.33px; margin-left: 0.00px; margin-top: 0.00px;">
+    <img alt="Record audio interface" src="images/record.png" style="width: 360.00px; height: 332.00px; margin-left: 0.00px; margin-top: 0.00px;">
     <ol>
         <li>
-            <b>Preview window:</b> Allows to visualize the loaded signal.
+            <b>Start recording button:</b> Allows to start recording.
         </li>
         <li>
-            <b>Selected fragment:</b> Allows to select a fragment of the audio file to listen to it and to load. Appears when clicking in the waveform and dragging the mouse to the sides.
+            <b>Stop recording button:</b> Allows to stop recording and plot the resulting signal. This signal (complete or a fragment) can be loaded into the control menu module by clicking into the "Load" button.
         </li>
         <li>
-            <b>“Load" button:</b> Opens a new control menu window to observe a signal with the selected parameters. If no fragment has been selected with the cursor, the whole signal will be loaded.
+            <b>Duration of the recording:</b> Allows to see the duration of the recording.
         </li>
     </ol>
 </body>

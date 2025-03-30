@@ -12,6 +12,9 @@ from matplotlib.widgets import SpanSelector, Button, RadioButtons
 
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
+from help import Help
+
+import os
 
 class PureTone(QDialog):
 
@@ -32,6 +35,29 @@ class PureTone(QDialog):
         self.setupUI()
         self.plotPureTone()
         self.setupAudioInteractions()  # Add this line to initialize audio interactions
+        self.help = Help(self)  # Create help system
+
+    def showHelp(self):
+        print("Help button clicked")  # Debug
+        if hasattr(self, 'help') and self.help:
+            print("Help system available")  # Debug
+            self.help.createHelpMenu(1)
+
+        else:
+            print("Help system not available")  # Debug
+
+        if hasattr(self, 'help') and self.help:
+            self.help.createHelpMenu(1)  # 1 corresponds to Pure Tone help
+        else:
+            # Fallback in case help system isn't initialized
+            QMessageBox.information(self, "Help", 
+                                   "Pure Tone Generator Help\n\n"
+                                   "This tool generates a pure sine wave with adjustable parameters:\n"
+                                   "- Duration: Length of the tone in seconds\n"
+                                   "- Amplitude: Volume of the tone (0-1)\n"
+                                   "- Frequency: Pitch of the tone in Hz\n"
+                                   "- Phase: Starting point in the wave cycle\n"
+                                   "- Offset: DC offset of the signal")
 
     def setupUI(self):
         main_layout = QVBoxLayout()
@@ -229,10 +255,6 @@ class PureTone(QDialog):
 
     def saveDefaults(self):
         # Implement your save functionality here
-        pass
-
-    def showHelp(self):
-        # Implement help functionality
         pass
 
     def createControlMenu(self):

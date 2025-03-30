@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
 from info import Info
-from helpqt import Help
+from help import Help
 from inputLoad import Load
 from inputRecord import Record
 from generateNoise import Noise
