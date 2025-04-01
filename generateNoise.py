@@ -1,206 +1,265 @@
-import tkinter as tk
+import sys
 import colorednoise as cn
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
-from tkinter import ttk
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
+                            QLabel, QSlider, QLineEdit, QPushButton, QComboBox, QMessageBox)
+from PyQt5.QtCore import Qt, pyqtSignal
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
 from matplotlib.widgets import SpanSelector, Button
 
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 
-import sys
-
-if sys.platform == "win32":
-    from ctypes import windll
-
-    # To avoid blurry fonts
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-else:
-    windll = None  # Or handle it differently for macOS
-    
-class Noise(tk.Frame):
+class Noise(QWidget):
     def __init__(self, master, controller):
-        tk.Frame.__init__(self, master)
+        super().__init__(master)
         self.controller = controller
         self.master = master
         self.aux = Auxiliar()
-        self.cm = ControlMenu()
-        self.fig, self.ax = plt.subplots()
         self.selectedAudio = np.empty(1)
-        self.noiseMenu()
-
-    def noiseMenu(self):
-        nm = tk.Toplevel()
-        nm.resizable(True, True)
-        nm.title('Generate noise')
-        nm.iconbitmap('icons/icon.ico')
-        nm.lift() # Place the toplevel window at the top
-        # self.aux.windowGeometry(nm, 850, 250)
-
-        # Adapt the window to different sizes
-        for i in range(4):
-            nm.columnconfigure(i, weight=1)
-
-        for i in range(4):
-            nm.rowconfigure(i, weight=1)
-
-        # If the 'generate' menu is closed, close also the generated figure
-        def on_closing():
-            nm.destroy()
-            plt.close(self.fig)
-        nm.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # Read the default values of the atributes from a csv file
-        list = self.aux.readFromCsv()
-        duration = list[0][2]
-        amplitude = list[0][4]
-        self.fs = list[0][6]
-        choice = list[0][8]
-
-        # SCALERS
-        nm.var_ampl = tk.DoubleVar(value=amplitude)
-        nm.var_dura = tk.DoubleVar(value=duration)
-
-        sca_ampl = tk.Scale(nm, from_=0, to=1, variable=nm.var_ampl, length=500, orient='horizontal', tickinterval=0.1, resolution=0.01)
-        sca_dura = tk.Scale(nm, from_=0.01, to=30, variable=nm.var_dura, length=500, orient='horizontal', resolution=0.01)
+        self.setup_ui()
         
-        sca_ampl.grid(column=1, row=1, sticky=tk.EW, padx=5, pady=5, columnspan=3)
-        sca_dura.grid(column=1, row=2, sticky=tk.N, padx=5, pady=5, columnspan=3)
-
-        # ENTRYS
-        nm.var_fs = tk.IntVar(value=self.fs)
-        vcmd = (nm.register(self.aux.onValidate), '%S', '%s', '%d')
-        vcfs = (nm.register(self.aux.onValidateInt), '%S')
+    def setup_ui(self):
+        self.setWindowTitle('Generate noise')
+        self.layout = QVBoxLayout(self)
         
-        ent_ampl = ttk.Entry(nm, textvariable=nm.var_ampl, validate='key', validatecommand=vcmd, width=10)
-        ent_dura = ttk.Entry(nm, textvariable=nm.var_dura, validate='key', validatecommand=vcmd, width=10)
-        ent_fs = ttk.Entry(nm, textvariable=nm.var_fs, validate='key', validatecommand=vcfs, width=10)
+        # Read default values
+        default_values = self.aux.readFromCsv()
+        self.duration = float(default_values[0][2])
+        self.amplitude = float(default_values[0][4])
+        self.fs = int(default_values[0][6])
+        self.noise_type = default_values[0][8]
         
-        def fsEntry(event):
-            fs = int(ent_fs.get())
-            if fs > 48000:
-                nm.var_fs.set('48000')
-                text = 'The sample frequency cannot be greater than 48000 Hz.'
-                tk.messagebox.showerror(parent=nm, title='Wrong sample frequency value', message=text)
-            else: return True
-
-        ent_fs.bind('<Return>', fsEntry)
+        # Noise type selection
+        type_layout = QHBoxLayout()
+        type_label = QLabel('Noise type:')
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(['White noise', 'Pink noise', 'Brown noise'])
+        self.type_combo.setCurrentText(self.noise_type)
+        type_layout.addWidget(type_label)
+        type_layout.addWidget(self.type_combo)
+        self.layout.addLayout(type_layout)
         
-        ent_ampl.grid(column=4, row=1, padx=5, pady=5)
-        ent_dura.grid(column=4, row=2, padx=5, pady=5, sticky=tk.S)
-        ent_fs.grid(column=1, row=3, padx=5, pady=5, sticky=tk.W)
+        # Amplitude control
+        ampl_layout = QHBoxLayout()
+        ampl_label = QLabel('Max. amplitude:')
+        self.ampl_slider = QSlider(Qt.Horizontal)
+        self.ampl_slider.setRange(0, 100)
+        self.ampl_slider.setValue(int(self.amplitude * 100))
+        self.ampl_entry = QLineEdit(f"{self.amplitude:.2f}")
+        self.ampl_entry.setFixedWidth(80)
+        ampl_layout.addWidget(ampl_label)
+        ampl_layout.addWidget(self.ampl_slider)
+        ampl_layout.addWidget(self.ampl_entry)
+        self.layout.addLayout(ampl_layout)
         
-        # LABELS
-        lab_type = ttk.Label(nm, text='Noise type')
-        lab_ampl = ttk.Label(nm, text='Max. amplitude')
-        lab_dura = ttk.Label(nm, text='Total duration (s)')
-        lab_fs = ttk.Label(nm, text='Fs (Hz)')
+        # Duration control
+        dura_layout = QHBoxLayout()
+        dura_label = QLabel('Total duration (s):')
+        self.dura_slider = QSlider(Qt.Horizontal)
+        self.dura_slider.setRange(1, 3000)  # 0.01 to 30.00 in steps of 0.01
+        self.dura_slider.setValue(int(self.duration * 100))
+        self.dura_entry = QLineEdit(f"{self.duration:.2f}")
+        self.dura_entry.setFixedWidth(80)
+        dura_layout.addWidget(dura_label)
+        dura_layout.addWidget(self.dura_slider)
+        dura_layout.addWidget(self.dura_entry)
+        self.layout.addLayout(dura_layout)
         
-        lab_type.grid(column=0, row=0, sticky=tk.E)
-        lab_ampl.grid(column=0, row=1, sticky=tk.E)
-        lab_dura.grid(column=0, row=2, sticky=tk.SE, pady=5)
-        lab_fs.grid(column=0, row=3, sticky=tk.E)
+        # Sample rate control
+        fs_layout = QHBoxLayout()
+        fs_label = QLabel('Fs (Hz):')
+        self.fs_entry = QLineEdit(str(self.fs))
+        self.fs_entry.setFixedWidth(80)
+        fs_layout.addWidget(fs_label)
+        fs_layout.addWidget(self.fs_entry)
+        self.layout.addLayout(fs_layout)
         
-        # BUTTONS
-        def checkValues(but):
-            self.fs = int(ent_fs.get()) # sample frequency
-            if fsEntry(self.fs) != True:
-                return
-            if but == 1: self.plotNoise(nm)
-            elif but == 2: self.saveDefaultValues(nm, list)
-
-        but_gene = ttk.Button(nm, command=lambda: checkValues(1), text='Plot')
-        but_save = ttk.Button(nm, command=lambda: checkValues(2), text='Save')
-        but_help = ttk.Button(nm, command=lambda: self.controller.help.createHelpMenu(5), text='🛈', width=2)
-
-        but_gene.grid(column=4, row=4, sticky=tk.EW, padx=5, pady=5)
-        but_save.grid(column=4, row=3, sticky=tk.EW, padx=5, pady=5)
-        but_help.grid(column=3, row=4, sticky=tk.E, padx=5, pady=5)
-
-        # OPTION MENU
-        nm.options = ('White noise','Pink noise', 'Brown noise')
-        nm.var_opts = tk.StringVar()
-        dd_opts = ttk.OptionMenu(nm, nm.var_opts, choice, *nm.options)
-        dd_opts.config(width=11, state='active')
-        dd_opts.grid(column=1, row=0, sticky=tk.W, padx=5)
-
-        checkValues(1)
-
-    def saveDefaultValues(self, nm, list):
-        choice = nm.var_opts.get()
-        amplitude = nm.var_ampl.get()
-        duration = nm.var_dura.get()
-
-        new_list = [['NOISE','\t duration', duration,'\t amplitude', amplitude,'\t fs', self.fs,'\t noise type', choice],
-                ['PURE TONE','\t duration', list[1][2],'\t amplitude', list[1][4],'\t fs', list[1][6],'\t offset', list[1][8],'\t frequency', list[1][10],'\t phase',  list[1][12]],
-                ['SQUARE WAVE','\t duration', list[2][2],'\t amplitude', list[2][4],'\t fs', list[2][6],'\t offset', list[2][8],'\t frequency', list[2][10],'\t phase', list[2][12],'\t active cycle', list[2][14]],
-                ['SAWTOOTH WAVE','\t duration', list[3][2],'\t amplitude', list[3][4],'\t fs', list[3][6],'\t offset', list[3][8],'\t frequency', list[3][10],'\t phase', list[3][12],'\t max position', list[3][14]],
-                ['FREE ADD OF PT','\t duration', list[4][2],'\t octave', list[4][4],'\t freq1', list[4][6],'\t freq2', list[4][8],'\t freq3', list[4][10],'\t freq4', list[4][12],'\t freq5', list[4][14],'\t freq6', list[4][16],'\t amp1', list[4][18],'\t amp2', list[4][20],'\t amp3', list[4][22],'\t amp4', list[4][24],'\t amp5', list[4][26],'\t amp6', list[4][28]],
-                ['SPECTROGRAM','\t colormap', list[5][2]]]
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.plot_button = QPushButton('Plot')
+        self.save_button = QPushButton('Save')
+        self.help_button = QPushButton('🛈')
+        self.help_button.setFixedWidth(30)
+        
+        button_layout.addWidget(self.save_button)
+        button_layout.addStretch()
+        button_layout.addWidget(self.help_button)
+        button_layout.addWidget(self.plot_button)
+        self.layout.addLayout(button_layout)
+        
+        # Connect signals
+        self.ampl_slider.valueChanged.connect(self.update_amplitude)
+        self.dura_slider.valueChanged.connect(self.update_duration)
+        self.ampl_entry.editingFinished.connect(self.update_amplitude_from_entry)
+        self.dura_entry.editingFinished.connect(self.update_duration_from_entry)
+        self.plot_button.clicked.connect(self.plot_noise)
+        self.save_button.clicked.connect(self.save_default_values)
+        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(5))
+        
+    def update_amplitude(self, value):
+        self.amplitude = value / 100
+        self.ampl_entry.setText(f"{self.amplitude:.2f}")
+        
+    def update_duration(self, value):
+        self.duration = value / 100
+        self.dura_entry.setText(f"{self.duration:.2f}")
+        
+    def update_amplitude_from_entry(self):
+        try:
+            value = float(self.ampl_entry.text())
+            if 0 <= value <= 1:
+                self.amplitude = value
+                self.ampl_slider.setValue(int(value * 100))
+            else:
+                self.ampl_entry.setText(f"{self.amplitude:.2f}")
+        except ValueError:
+            self.ampl_entry.setText(f"{self.amplitude:.2f}")
+            
+    def update_duration_from_entry(self):
+        try:
+            value = float(self.dura_entry.text())
+            if 0.01 <= value <= 30:
+                self.duration = value
+                self.dura_slider.setValue(int(value * 100))
+            else:
+                self.dura_entry.setText(f"{self.duration:.2f}")
+        except ValueError:
+            self.dura_entry.setText(f"{self.duration:.2f}")
+            
+    def save_default_values(self):
+        default_values = self.aux.readFromCsv()
+        choice = self.type_combo.currentText()
+        amplitude = self.amplitude
+        duration = self.duration
+        
+        new_list = [
+            ['NOISE','\t duration', duration,'\t amplitude', amplitude,'\t fs', self.fs,'\t noise type', choice],
+            ['PURE TONE','\t duration', default_values[1][2],'\t amplitude', default_values[1][4],'\t fs', default_values[1][6],'\t offset', default_values[1][8],'\t frequency', default_values[1][10],'\t phase',  default_values[1][12]],
+            ['SQUARE WAVE','\t duration', default_values[2][2],'\t amplitude', default_values[2][4],'\t fs', default_values[2][6],'\t offset', default_values[2][8],'\t frequency', default_values[2][10],'\t phase', default_values[2][12],'\t active cycle', default_values[2][14]],
+            ['SAWTOOTH WAVE','\t duration', default_values[3][2],'\t amplitude', default_values[3][4],'\t fs', default_values[3][6],'\t offset', default_values[3][8],'\t frequency', default_values[3][10],'\t phase', default_values[3][12],'\t max position', default_values[3][14]],
+            ['FREE ADD OF PT','\t duration', default_values[4][2],'\t octave', default_values[4][4],'\t freq1', default_values[4][6],'\t freq2', default_values[4][8],'\t freq3', default_values[4][10],'\t freq4', default_values[4][12],'\t freq5', default_values[4][14],'\t freq6', default_values[4][16],'\t amp1', default_values[4][18],'\t amp2', default_values[4][20],'\t amp3', default_values[4][22],'\t amp4', default_values[4][24],'\t amp5', default_values[4][26],'\t amp6', default_values[4][28]],
+            ['SPECTROGRAM','\t colormap', default_values[5][2]]
+        ]
         self.aux.saveDefaultAsCsv(new_list)
-
-    def plotNoise(self, nm):
-        choice = nm.var_opts.get()
-        amplitude = nm.var_ampl.get()
-        duration = nm.var_dura.get()
-        samples = int(duration*self.fs)
-
+        
+    def plot_noise(self):
+        try:
+            self.fs = int(self.fs_entry.text())
+            if self.fs > 48000:
+                self.fs = 48000
+                self.fs_entry.setText("48000")
+                QMessageBox.warning(self, 'Wrong sample frequency value', 
+                                   'The sample frequency cannot be greater than 48000 Hz.')
+                return
+        except ValueError:
+            QMessageBox.warning(self, 'Invalid Input', 'Please enter a valid integer for sample frequency.')
+            return
+            
+        choice = self.type_combo.currentText()
+        samples = int(self.duration * self.fs)
+        
         if choice == 'White noise':
             beta = 0
         elif choice == 'Pink noise':
             beta = 1
         elif choice == 'Brown noise':
             beta = 2
-
-        time = np.linspace(start=0, stop=duration, num=samples, endpoint=False)
-        noiseGaussian = cn.powerlaw_psd_gaussian(beta, samples)
-        noise = amplitude * noiseGaussian / max(abs(noiseGaussian))
-
-        # noisePower = noise*np.sqrt(power) # con control de potencia (power = amplitude)
-        # # Para calcular la potencia
-        # L2 = [x**2 for x in noise]
-        # suma = sum(L2)/np.size(noise)
-
-        # If the window has been closed, create it again
-        if plt.fignum_exists(self.fig.number):
-            self.ax.clear() # delete the previous plot
-        else:
-            self.fig, self.ax = plt.subplots() # create the window
-
-        fig, ax = self.fig, self.ax
-        self.addLoadButton(fig, ax, self.fs, time, noise, duration, nm, choice)
-        
-        # Plot the noise
-        ax.plot(time, noise)
-        fig.canvas.manager.set_window_title(choice)
-        ax.set(xlim=[0, duration], xlabel='Time (s)', ylabel='Amplitude')
-        ax.axhline(y=0, color='black', linewidth='0.5', linestyle='--') # draw an horizontal line in y=0.0
-
-        plt.show()
-
-    def addLoadButton(self, fig, ax, fs, time, audio, duration, menu, name):
-        # Takes the selected fragment and opens the control menu when clicked
-        def load(event):
-            if self.selectedAudio.shape == (1,): 
-                self.cm.createControlMenu(name, fs, audio, duration, self.controller)
-            else:
-                time = np.arange(0, len(self.selectedAudio)/fs, 1/fs) # time array of the audio
-                durSelec = max(time) # duration of the selected fragment
-                self.cm.createControlMenu(name, fs, self.selectedAudio, durSelec, self.controller)
-            plt.close(fig)
-            menu.destroy()
-
-        # Adds a 'Load' button to the figure
-        axload = fig.add_axes([0.8, 0.01, 0.09, 0.05]) # [left, bottom, width, height]
-        but_load = Button(axload, 'Load')
-        but_load.on_clicked(load)
-        axload._but_load = but_load # reference to the Button (otherwise the button does nothing)
-
-        def listenFrag(xmin, xmax):
-            ini, end = np.searchsorted(time, (xmin, xmax))
-            self.selectedAudio = audio[ini:end+1]
-            sd.play(self.selectedAudio, fs)
             
-        self.span = SpanSelector(ax, listenFrag, 'horizontal', useblit=True, interactive=True, drag_from_anywhere=True)
+        time = np.linspace(start=0, stop=self.duration, num=samples, endpoint=False)
+        noiseGaussian = cn.powerlaw_psd_gaussian(beta, samples)
+        noise = self.amplitude * noiseGaussian / max(abs(noiseGaussian))
+        
+        # Create plot window
+        self.plot_window = PlotWindow(choice, self.fs, time, noise, self.duration, self.controller)
+        self.plot_window.show()
+        
+    def create_control_menu(self, name, fs, audio, duration):
+        """Helper method to create ControlMenu with required parameters"""
+        return ControlMenu(name, fs, audio, duration, self.controller, self)
+
+
+class PlotWindow(QMainWindow):
+    def __init__(self, title, fs, time, audio, duration, controller):
+        super().__init__()
+        self.controller = controller
+        self.fs = fs
+        self.time = time
+        self.audio = audio
+        self.duration = duration
+        self.title = title
+        self.selectedAudio = np.empty(1)
+        self.setWindowTitle(title)
+        self.setup_ui()
+        
+    def setup_ui(self):
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        self.ax = self.figure.add_subplot(111)
+        
+        # Add load button
+        self.load_ax = self.figure.add_axes([0.8, 0.01, 0.09, 0.05])
+        self.load_button = Button(self.load_ax, 'Load')
+        self.load_button.on_clicked(self.load_selection)
+        
+        central_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+        
+        self.plot()
+        
+    def plot(self):
+        self.ax.clear()
+        self.ax.plot(self.time, self.audio)
+        self.ax.set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
+        self.ax.axhline(y=0, color='black', linewidth='0.5', linestyle='--')
+        
+        # Add span selector
+        self.span = SpanSelector(self.ax, self.listen_fragment, 'horizontal', 
+                               useblit=True, interactive=True, drag_from_anywhere=True)
+        
+        self.canvas.draw()
+        
+    def listen_fragment(self, xmin, xmax):
+        ini, end = np.searchsorted(self.time, (xmin, xmax))
+        self.selectedAudio = self.audio[ini:end+1]
+        sd.play(self.selectedAudio, self.fs)
+        
+    def load_selection(self, event):
+        try:
+            if self.selectedAudio.shape == (1,): 
+                # Create control menu with full audio
+                control_menu = ControlMenu(
+                    fileName=self.title,
+                    fs=self.fs,
+                    audioFrag=self.audio,
+                    duration=self.duration,
+                    controller=self.controller,
+                    parent=self
+                )
+            else:
+                # Create control menu with selected fragment
+                time = np.arange(0, len(self.selectedAudio)/self.fs, 1/self.fs)
+                durSelec = max(time)
+                control_menu = ControlMenu(
+                    fileName=self.title,
+                    fs=self.fs,
+                    audioFrag=self.selectedAudio,
+                    duration=durSelec,
+                    controller=self.controller,
+                    parent=self
+                )
+            control_menu.show()
+            self.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to create control menu: {str(e)}")
+

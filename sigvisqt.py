@@ -35,8 +35,12 @@ class Start(QMainWindow):
         self.setWindowTitle("Signal Visualizer")
         self.setWindowIcon(QIcon('icons/icon.ico'))
 
+        self.icons = {
+            'icon': QIcon('icons/icon.ico')  # Make sure this path is correct
+        }
+
         # Set window size and center it
-        self.resize(750, 450)  # Set initial window size
+        self.resize(900, 650)  # Increased size to accommodate Info content
         self.center_window()    # Center the window
 
         # Central widget and layout
@@ -47,7 +51,9 @@ class Start(QMainWindow):
 
         # Dictionary to hold frames
         self.frames = {}
-        self.initialize_frame('SignalVisualizer')
+        
+        # Initialize and show Info frame by default
+        self.initialize_frame('Info')
 
         # Initialize Help and AdvancedSettings
         self.help = Help(self.container, self)

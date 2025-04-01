@@ -14,6 +14,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QIcon
 
+from queue import Queue
+import threading
+
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 from help import Help
@@ -24,14 +27,23 @@ class FreeAdditionPureTones(QDialog):
         super().__init__(parent)
         self.controller = controller
         self.fs = 48000  # sample frequency
+        sd.default.samplerate = self.fs
+        sd.default.blocksize = 1024  # Optimal for responsiveness
+        sd.default.latency = 'low'
         self.aux = Auxiliar()
         self.selectedAudio = np.empty(1)
 
         self.help = Help(self)  # Initialize help system like in PureTone
 
+        self.piano = None  # Initialize reference
         self.pianoOpen = False
         self.amp_sliders = []
         self.freq_spinboxes = []
+
+        # Initialize audio storage
+        self.full_audio = np.empty(1)  # Will store the complete generated audio
+        self.selectedAudio = np.empty(1)  # Will store selected portions
+        self.audio_duration = 0.0
         
         # Default values
         self.default_values = [
@@ -44,6 +56,10 @@ class FreeAdditionPureTones(QDialog):
             'amp4', '0.5', 'amp5', '0.33', 'amp6', '0.17'
         ]
         
+        self.audio_queue = Queue()
+        self.audio_thread = threading.Thread(target=self._audio_worker, daemon=True)
+        self.audio_thread.start()
+
         # Load from CSV or use defaults
         try:
             csv_data = self.aux.readFromCsv()
@@ -121,6 +137,8 @@ class FreeAdditionPureTones(QDialog):
             btn.clicked.connect(callback)
             btn.setMaximumWidth(80)
             btn_layout.addWidget(btn)
+            if text == 'Piano':  # Store reference to piano button
+                self.piano_btn = btn
         
         # Add to main layout
         main_layout.addWidget(control_panel)
@@ -300,8 +318,15 @@ class FreeAdditionPureTones(QDialog):
         nav_layout.addWidget(next_btn)
         main_layout.addLayout(nav_layout)
         
-        self.pianoOpen = True
+        def on_close():
+            self.piano = None  # Important: release reference
+            if hasattr(self, 'piano_btn'):
+                self.piano_btn.setEnabled(True)
+    
+        self.piano.finished.connect(on_close)
         self.piano.show()
+        if hasattr(self, 'piano_btn'):
+            self.piano_btn.setEnabled(False)
 
     def get_note_name(self, note_value):
         """Convert MIDI note number to scientific pitch notation (e.g., C4)"""
@@ -309,30 +334,64 @@ class FreeAdditionPureTones(QDialog):
         note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
         return f"{note_names[note_value % 12]}{octave}"
 
+
+    def _audio_worker(self):
+        """Background thread for smooth audio playback"""
+        while True:
+            signal, fs = self.audio_queue.get()
+            if signal is None:  # Exit signal
+                break
+            try:
+                sd.play(signal, fs, blocking=True)
+                sd.wait()  # Wait for playback to finish
+            except Exception as e:
+                print(f"Audio playback error: {e}")
+
     def playNote(self, note_value):
-        """Play a note and set harmonics based on current octave"""
-        octave = self.octave_spinbox.value()
-        midi_note = note_value + (octave * 12)
-        frequency = 440 * (2 ** ((midi_note - 69) / 12))  # A4 = 440Hz = MIDI 69
-        
-        # Set fundamental frequency
-        self.freq_spinboxes[0].setValue(round(frequency, 2))
-        self.amp_sliders[0].setValue(100)  # Full amplitude
-        
-        # Set harmonics
-        harmonics = [(2, 0.83), (3, 0.67), (4, 0.5), (5, 0.33), (6, 0.17)]
-        for i, (multiple, amp) in enumerate(harmonics, start=1):
-            self.freq_spinboxes[i].setValue(round(frequency * multiple, 2))
-            self.amp_sliders[i].setValue(int(amp * 100))
-        
-        # Play the note
-        duration = 1.0  # seconds
-        samples = int(duration * self.fs)
-        time = np.linspace(0, duration, samples, endpoint=False)
-        signal = np.sin(2 * np.pi * frequency * time)
-        sd.play(signal, self.fs)
-        
-        self.plotFAPT()
+        """Glitch-free note playback with proper audio stream management"""
+        try:
+            # Calculate frequency
+            octave = self.octave_spinbox.value()
+            midi_note = note_value + (octave * 12)
+            frequency = 440 * (2 ** ((midi_note - 69) / 12))
+            
+            # Audio parameters
+            duration = 0.5  # seconds
+            samples = int(duration * self.fs)
+            fade_samples = int(0.02 * self.fs)  # 20ms fade in/out
+            
+            # Generate signal with harmonics and fade
+            t = np.linspace(0, duration, samples, False)
+            
+            # Create richer sound with harmonics
+            signal = (0.6 * np.sin(2 * np.pi * frequency * t) +
+                     0.3 * np.sin(2 * np.pi * 2 * frequency * t) +
+                     0.1 * np.sin(2 * np.pi * 3 * frequency * t))
+            
+            # Apply fade in/out
+            if fade_samples > 0:
+                fade_in = np.linspace(0, 1, fade_samples) ** 2  # Quadratic fade for smoother start
+                fade_out = np.linspace(1, 0, fade_samples) ** 2
+                signal[:fade_samples] *= fade_in
+                signal[-fade_samples:] *= fade_out
+            
+            # Use sounddevice's stream for better performance
+            with sd.OutputStream(samplerate=self.fs, blocksize=2048, channels=1) as stream:
+                stream.write(signal.astype(np.float32))
+            
+            # Update UI
+            self.freq_spinboxes[0].setValue(round(frequency, 2))
+            self.amp_sliders[0].setValue(100)
+            
+        except Exception as e:
+            print(f"Audio error: {e}")
+
+
+    def closeEvent(self, event):
+        """Clean up when closing"""
+        self.audio_queue.put((None, None))  # Stop audio thread
+        super().closeEvent(event)
+
     def notesHarmonics(self, note_value):
         """Handle piano key presses with the new note numbering"""
         octave = self.octave_spinbox.value()
@@ -353,12 +412,13 @@ class FreeAdditionPureTones(QDialog):
         self.plotFAPT()
     
     def togglePiano(self):
+        """Properly manage piano window lifecycle"""
         if not self.pianoOpen:
             self.showPiano()
         else:
-            self.piano.close()
-    
-    
+            self.piano.close()  # This triggers our close handler
+
+        
 
     def plotFAPT(self):
         duration = self.getDuration()
@@ -372,6 +432,10 @@ class FreeAdditionPureTones(QDialog):
         for freq, amp in zip(freqs, amps):
             signal += amp * np.sin(2 * np.pi * freq * time)
         
+        # Store the full audio signal
+        self.full_audio = signal
+        self.audio_duration = duration
+
         self.ax.clear()
         self.ax.plot(time, signal)
         
@@ -390,27 +454,26 @@ class FreeAdditionPureTones(QDialog):
         self.addLoadButton(signal, duration)
         
         self.canvas.draw()
-    
+ 
+
+
     def addLoadButton(self, audio, duration):
         # Remove previous button if exists
         if hasattr(self, 'load_btn_ax'):
             self.load_btn_ax.remove()
+            if hasattr(self, 'span'):
+                del self.span
+        
+        # Store the current audio
+        self.full_audio = audio
+        self.audio_duration = duration
         
         # Create new button
         self.load_btn_ax = self.fig.add_axes([0.8, 0.01, 0.09, 0.05])
         self.load_btn = Button(self.load_btn_ax, 'Load')
         
         def load(event):
-            if self.selectedAudio.shape == (1,):
-                self.cm = ControlMenu()
-                self.cm.createControlMenu(
-                    'Free addition of pure tones',
-                    self.fs,
-                    audio,
-                    duration,
-                    self.controller
-                )
-            else:
+            if hasattr(self, 'selectedAudio') and len(self.selectedAudio) > 1:
                 durSelec = len(self.selectedAudio) / self.fs
                 self.cm = ControlMenu()
                 self.cm.createControlMenu(
@@ -420,7 +483,15 @@ class FreeAdditionPureTones(QDialog):
                     durSelec,
                     self.controller
                 )
-            self.close()
+            else:
+                self.cm = ControlMenu()
+                self.cm.createControlMenu(
+                    'Free addition of pure tones',
+                    self.fs,
+                    self.full_audio,
+                    self.audio_duration,
+                    self.controller
+                )
         
         self.load_btn.on_clicked(load)
         
@@ -428,9 +499,28 @@ class FreeAdditionPureTones(QDialog):
         time = np.linspace(0, duration, len(audio), endpoint=False)
         
         def onselect(xmin, xmax):
+            if not hasattr(self, 'full_audio') or len(self.full_audio) <= 1:
+                return
+                
             ini, end = np.searchsorted(time, (xmin, xmax))
-            self.selectedAudio = audio[ini:end+1]
-            sd.play(self.selectedAudio, self.fs)
+            selected_audio = self.full_audio[ini:end+1].copy()
+            
+            # Apply fade to prevent clicks
+            fade_samples = min(int(0.02 * self.fs), len(selected_audio)//4)
+            if fade_samples > 0:
+                fade_in = np.linspace(0, 1, fade_samples) ** 2
+                fade_out = np.linspace(1, 0, fade_samples) ** 2
+                selected_audio[:fade_samples] *= fade_in
+                selected_audio[-fade_samples:] *= fade_out
+            
+            self.selectedAudio = selected_audio
+            
+            # Play with proper stream management
+            try:
+                sd.stop()
+                sd.play(selected_audio, self.fs, blocking=False)
+            except Exception as e:
+                print(f"Playback error: {e}")
         
         self.span = SpanSelector(
             self.ax,
