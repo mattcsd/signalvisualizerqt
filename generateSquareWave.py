@@ -1,74 +1,216 @@
-from PyQt5 import QtWidgets, QtGui
-import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QLineEdit, QPushButton, 
+                            QSlider, QMessageBox, QVBoxLayout, QHBoxLayout, QGridLayout)
+from PyQt5.QtCore import Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.widgets import SpanSelector
 from scipy import signal
-
-from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 
-class SquareWave(QtWidgets.QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.aux = Auxiliar()
-        self.cm = ControlMenu()
-        self.fig, self.ax = plt.subplots()
+class SquareWave(QWidget):
+    def __init__(self, master, controller):
+        super().__init__(master)
+        self.controller = controller
+        self.master = master
         self.selectedAudio = np.empty(1)
-        self.initUI()
-
-    def initUI(self):
-        self.setWindowTitle('Generate Square Wave')
-        self.setGeometry(100, 100, 850, 500)
-
-        layout = QtWidgets.QVBoxLayout()
-        
-        # Read default values from CSV
-        data = self.aux.readFromCsv()
-        duration, amplitude, self.fs, offset, frequency, phase, cycle = (
-            data[2][2], data[2][4], data[2][6], data[2][8], data[2][10], data[2][12], data[2][14]
-        )
-        
-        # Sliders
+        self.default_values = {
+            'duration': 1.0,
+            'amplitude': 0.8,
+            'fs': 44100,
+            'offset': 0.0,
+            'frequency': 440,
+            'phase': 0.0,
+            'duty': 0.5  # Changed from maxpos to duty for square wave
+        }
         self.sliders = {}
-        params = {'Duration (s)': duration, 'Offset': offset, 'Amplitude': amplitude, 
-                  'Frequency (Hz)': frequency, 'Phase (π rad)': phase, 'Active Cycle (%)': cycle}
+
+        self.setupUI()
+        self.plotSquareWave()
+        self.setupAudioInteractions()
+
+    def showHelp(self):
+        if hasattr(self, 'help') and self.help:
+            self.help.openHelpPage('square_help.html')
+        else:
+            QMessageBox.information(self, "Help", 
+                                   "Square Wave Generator Help\n\n"
+                                   "This tool generates a square wave with adjustable parameters:\n"
+                                   "- Duration: Length in seconds\n"
+                                   "- Amplitude: Volume (0-1)\n"
+                                   "- Frequency: Pitch in Hz\n"
+                                   "- Phase: Starting point in cycle\n"
+                                   "- Duty Cycle: Percentage of active cycle (0-1)\n"
+                                   "- Offset: DC offset")
+
+    def setupUI(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        for key, val in params.items():
-            label = QtWidgets.QLabel(key)
-            slider = QtWidgets.QSlider()
-            slider.setOrientation(QtCore.Qt.Horizontal)
-            slider.setValue(int(val))
-            layout.addWidget(label)
-            layout.addWidget(slider)
-            self.sliders[key] = slider
+        # Figure setup
+        self.fig = plt.figure(figsize=(8, 4))
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvas(self.fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        main_layout.addWidget(self.toolbar)
+        main_layout.addWidget(self.canvas)
+        main_layout.addLayout(self.create_controls())
+        
+        self.setLayout(main_layout)
 
-        # Buttons
-        self.plotButton = QtWidgets.QPushButton('Plot')
-        self.plotButton.clicked.connect(self.plotSquareWave)
-        layout.addWidget(self.plotButton)
+    def setupAudioInteractions(self):
+        self.span = SpanSelector(
+            self.ax,
+            self.on_select_region,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+        self.span.set_active(True)
 
-        self.setLayout(layout)
+    def on_select_region(self, xmin, xmax):
+        if len(self.selectedAudio) <= 1:
+            return
+            
+        fs = self.default_values['fs']
+        duration = self.sliders['Duration (s)'].value() / 100
+        time = np.linspace(0, duration, len(self.selectedAudio), endpoint=False)
+        
+        idx_min = np.argmax(time >= xmin)
+        idx_max = np.argmax(time >= xmax)
+        
+        sd.stop()
+        sd.play(self.selectedAudio[idx_min:idx_max], fs)
+
+    def create_controls(self):
+        layout = QGridLayout()
+        layout.setVerticalSpacing(8)
+        layout.setHorizontalSpacing(10)
+        
+        self.sliders['Duration (s)'] = self.create_slider(0.01, 30.0, self.default_values['duration'])
+        self.sliders['Offset'] = self.create_slider(-1.0, 1.0, self.default_values['offset'])
+        self.sliders['Amplitude'] = self.create_slider(0.0, 1.0, self.default_values['amplitude'])
+        self.sliders['Frequency (Hz)'] = self.create_slider(0, 20000, self.default_values['frequency'], is_float=False)
+        self.sliders['Phase (π rad)'] = self.create_slider(-1.0, 1.0, self.default_values['phase'])
+        self.sliders['Duty Cycle'] = self.create_slider(0.0, 1.0, self.default_values['duty'])
+        
+        for i, (label, slider) in enumerate(self.sliders.items()):
+            layout.addWidget(QLabel(label), i, 0, alignment=Qt.AlignRight)
+            layout.addWidget(slider, i, 1, 1, 2)
+            layout.addWidget(self.create_value_display(slider, label.endswith('Hz)')), i, 3)
+        
+        btn_layout = QHBoxLayout()
+        
+        self.save_button = QPushButton('Save')
+        self.help_button = QPushButton('🛈')
+        self.plot_button = QPushButton('Plot')
+        
+        self.help_button.setFixedWidth(30)
+        
+        btn_layout.addWidget(self.save_button)
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(self.help_button)
+        btn_layout.addWidget(self.plot_button)
+
+        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(3))
+        self.plot_button.clicked.connect(self.plotSquareWave)
+        self.save_button.clicked.connect(self.saveDefaults)
+        
+        layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
+        
+        return layout
 
     def plotSquareWave(self):
-        amplitude = self.sliders['Amplitude'].value()
-        frequency = self.sliders['Frequency (Hz)'].value()
-        phase = self.sliders['Phase (π rad)'].value()
-        cycle = self.sliders['Active Cycle (%)'].value()
-        duration = self.sliders['Duration (s)'].value()
-        offset = self.sliders['Offset'].value()
-        samples = int(duration * self.fs)
-
-        time = np.linspace(0, duration, samples, endpoint=False)
-        square = amplitude * (signal.square(2 * np.pi * frequency * time + phase * np.pi, duty=cycle / 100) / 2) + offset
-        
+        # Clear any existing span selector first
+        if hasattr(self, 'span'):
+            self.span.clear()
+            del self.span
+            
         self.ax.clear()
-        self.ax.plot(time, square)
-        self.ax.set(title='Square Wave', xlabel='Time (s)', ylabel='Amplitude')
-        plt.show()
+        
+        # Get parameters
+        duration = self.sliders['Duration (s)'].value() / 100
+        amplitude = self.sliders['Amplitude'].value() / 100
+        frequency = self.sliders['Frequency (Hz)'].value()
+        phase = self.sliders['Phase (π rad)'].value() / 100
+        offset = self.sliders['Offset'].value() / 100
+        duty = self.sliders['Duty Cycle'].value() / 100
+        fs = self.default_values['fs']
+        
+        # Generate signal
+        samples = int(duration * fs)
+        time = np.linspace(0, duration, samples, endpoint=False)
+        self.selectedAudio = amplitude * signal.square(2*np.pi*frequency*time + phase*np.pi, duty=duty) + offset
+        
+        # Plot
+        self.ax.plot(time, self.selectedAudio, linewidth=1.5, color='blue')
+        self.ax.set(xlim=[0, duration], 
+                   ylim=[-1.1, 1.1],
+                   xlabel='Time (s)', 
+                   ylabel='Amplitude')
+        self.ax.grid(True, linestyle=':', alpha=0.5)
+        
+        self.canvas.draw()
+        self.setupAudioInteractions()
 
-if __name__ == '__main__':
-    app = QtWidgets.QApplication(sys.argv)
-    window = SquareWave()
-    window.show()
-    sys.exit(app.exec_())
+    def reset_to_defaults(self):
+        for name, value in self.default_values.items():
+            if name == 'frequency':
+                self.sliders['Frequency (Hz)'].setValue(value)
+            elif name == 'fs':
+                continue  # Not adjustable via slider
+            else:
+                slider_name = {
+                    'duration': 'Duration (s)',
+                    'amplitude': 'Amplitude',
+                    'offset': 'Offset',
+                    'phase': 'Phase (π rad)',
+                    'duty': 'Duty Cycle'
+                }.get(name)
+                if slider_name:
+                    self.sliders[slider_name].setValue(int(value * 100))
+        
+        self.plotSquareWave()
+
+    def create_slider(self, min_val, max_val, init_val, is_float=True):
+        slider = QSlider(Qt.Horizontal)
+        slider.setRange(int(min_val*100), int(max_val*100)) if is_float else slider.setRange(min_val, max_val)
+        slider.setValue(int(init_val*100)) if is_float else slider.setValue(init_val)
+        slider.valueChanged.connect(self.update_plot)
+        return slider
+
+    def create_value_display(self, slider, is_int=False):
+        value = slider.value() / 100 if not is_int else slider.value()
+        input_field = QLineEdit(f"{value:.2f}" if not is_int else f"{value}")
+        input_field.setFixedWidth(50)
+        input_field.setAlignment(Qt.AlignCenter)
+        input_field.returnPressed.connect(lambda: self.update_slider_from_input(slider, input_field, is_int))
+        slider.valueChanged.connect(lambda v: input_field.setText(f"{v/100:.2f}" if not is_int else f"{v}"))
+        return input_field
+
+    def update_plot(self):
+        self.plotSquareWave()
+
+    def saveDefaults(self):
+        # Implement your save functionality here
+        pass
+
+    def createControlMenu(self):
+        duration = self.sliders['Duration (s)'].value() / 100
+        fs = self.default_values['fs']
+        signal = self.selectedAudio
+        name = "Square Wave"
+        
+        self.cm = ControlMenu(name, fs, signal, duration, self.controller)
+        self.cm.show()
+
+    def update_slider_from_input(self, slider, input_field, is_int):
+        try:
+            value = float(input_field.text()) if not is_int else int(input_field.text())
+            slider.setValue(int(value * 100) if not is_int else value)
+        except ValueError:
+            input_field.setText(f"{slider.value()/100:.2f}" if not is_int else f"{slider.value()}")

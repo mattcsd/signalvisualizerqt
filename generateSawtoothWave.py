@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 import unicodedata
-from PyQt5.QtWidgets import (QApplication, QDialog, QLabel, QLineEdit, QPushButton, 
+from PyQt5.QtWidgets import (QApplication, QWidget, QDialog, QLabel, QLineEdit, QPushButton, 
                             QRadioButton, QCheckBox, QComboBox, QGridLayout, 
                             QSlider, QMessageBox, QVBoxLayout, QHBoxLayout)
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -12,13 +12,13 @@ from matplotlib.widgets import SpanSelector, Button, RadioButtons
 
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
-from help import Help
 from scipy import signal
 
-class SawtoothWave(QDialog):
-    def __init__(self, controller, parent=None):
-        super().__init__(parent)
+class SawtoothWave(QWidget):
+    def __init__(self, master, controller):
+        super().__init__(master)
         self.controller = controller
+        self.master = master
         self.selectedAudio = np.empty(1)
         self.default_values = {
             'duration': 1.0,
@@ -30,11 +30,10 @@ class SawtoothWave(QDialog):
             'maxpos': 1.0
         }
         self.sliders = {}
-        
+
         self.setupUI()
         self.plotSawtoothWave()
         self.setupAudioInteractions()
-        self.help = Help(self)
 
     def showHelp(self):
         if hasattr(self, 'help') and self.help:
@@ -54,8 +53,7 @@ class SawtoothWave(QDialog):
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Math display
-        
+
         
         # Figure setup
         self.fig = plt.figure(figsize=(8, 4))
@@ -94,12 +92,12 @@ class SawtoothWave(QDialog):
         sd.stop()
         sd.play(self.selectedAudio[idx_min:idx_max], fs)
 
+
     def create_controls(self):
         layout = QGridLayout()
         layout.setVerticalSpacing(8)
         layout.setHorizontalSpacing(10)
         
-        # Create sliders
         self.sliders['Duration (s)'] = self.create_slider(0.01, 30.0, self.default_values['duration'])
         self.sliders['Offset'] = self.create_slider(-1.0, 1.0, self.default_values['offset'])
         self.sliders['Amplitude'] = self.create_slider(0.0, 1.0, self.default_values['amplitude'])
@@ -107,19 +105,28 @@ class SawtoothWave(QDialog):
         self.sliders['Phase (π rad)'] = self.create_slider(-1.0, 1.0, self.default_values['phase'])
         self.sliders['Max Position'] = self.create_slider(0.0, 1.0, self.default_values['maxpos'])
         
-        # Add to layout
         for i, (label, slider) in enumerate(self.sliders.items()):
             layout.addWidget(QLabel(label), i, 0, alignment=Qt.AlignRight)
             layout.addWidget(slider, i, 1, 1, 2)
             layout.addWidget(self.create_value_display(slider, label.endswith('Hz)')), i, 3)
         
-        # Buttons layout
         btn_layout = QHBoxLayout()
-        btn_layout.addWidget(QPushButton('Save', clicked=self.saveDefaults))
-        btn_layout.addWidget(QPushButton('Plot', clicked=self.plotSawtoothWave))
+        
+        self.save_button = QPushButton('Save')
+        self.help_button = QPushButton('🛈')
+        self.plot_button = QPushButton('Plot')
+        
+        self.help_button.setFixedWidth(30)
+        
+        btn_layout.addWidget(self.save_button)
         btn_layout.addStretch(1)
-        btn_layout.addWidget(QPushButton('Default Values', clicked=self.reset_to_defaults))
-        btn_layout.addWidget(QPushButton('🛈 Help', clicked=self.showHelp))
+        btn_layout.addWidget(self.help_button)
+        btn_layout.addWidget(self.plot_button)
+
+        
+        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(4))
+        self.plot_button.clicked.connect(self.plotSawtoothWave)
+        self.save_button.clicked.connect(self.saveDefaults)
         
         layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
         
@@ -127,6 +134,11 @@ class SawtoothWave(QDialog):
 
 
     def plotSawtoothWave(self):
+        # Clear any existing span selector first
+        if hasattr(self, 'span'):
+            self.span.clear()
+            del self.span
+            
         self.ax.clear()
         
         # Get parameters

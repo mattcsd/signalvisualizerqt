@@ -1,91 +1,172 @@
-import tkinter as tk, tkinter.filedialog
-import struct
-import librosa
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, SpanSelector
+import librosa
+import struct
 from pathlib import Path
-
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, 
+                            QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox)
+from PyQt5.QtCore import Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.widgets import SpanSelector, Button
+from matplotlib.figure import Figure
 from controlMenu import ControlMenu
 
-import sys
-
-if sys.platform == "win32":
-    from ctypes import windll
-
-    # To avoid blurry fonts
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-else:
-    windll = None  # Or handle it differently for macOS
-
-class Load(tk.Frame):
+class Load(QWidget):
     def __init__(self, master, controller):
-        tk.Frame.__init__(self, master)
+        super().__init__(master)
         self.controller = controller
+        self.master = master
         self.selectedAudio = np.empty(1)
-        self.cm = ControlMenu()
-        self.loadAudio()
-
+        self.fs = 44100  # Default sample rate
+        self.file_path = ""
+        
+        self.setupUI()
+        
+    def setupUI(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Create open file button
+        self.open_button = QPushButton('Open Audio File')
+        self.open_button.clicked.connect(self.loadAudio)
+        
+        # Figure setup
+        self.fig = Figure(figsize=(8, 4))
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvas(self.fig)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        # Add widgets to layout
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.open_button)
+        button_layout.addStretch()
+        
+        main_layout.addLayout(button_layout)
+        main_layout.addWidget(self.toolbar)
+        main_layout.addWidget(self.canvas)
+        
+        self.setLayout(main_layout)
+        
     def loadAudio(self):
-        # Ask the user to select a .wav file
-        file = tk.filedialog.askopenfilename(title="Open file", initialdir='library/', filetypes=(("wav files","*.wav"),)) # select audio file
-        if file == '': # if no file has been selected
+        # Open file dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Open Audio File", 
+            "", 
+            "WAV Files (*.wav);;All Files (*)"
+        )
+        
+        if not file_path:  # User cancelled
             return
-
-        audio, fs = sf.read(file, dtype='float32')
-
-        # If the file is stereo (2 channels), convert it to mono (1 channel)
-        # We are not using wave.open(file, 'rb') because it gives "wave.Error: unknown format: 3" with some wav files
-        with open(file, 'rb') as wav:
-            header_beginning = wav.read(0x18)
-            wavChannels, = struct.unpack_from('<H', header_beginning, 0x16)
-            if wavChannels > 1:
-                tk.messagebox.showwarning(title="Stereo file", message="This file is in stereo mode. It will be converted into a mono file.") # show warning
-                ampMax = np.ndarray.max(abs(audio)) # max amplitude
-                audio = np.sum(audio, axis=1) # from stereo to mono
-                audio = audio * ampMax / np.ndarray.max(abs(audio)) # normalize and leave with the max amplitude
-        
-        self.plotAudio(file, audio, fs)
-
-    def plotAudio(self, file, audio, fs):
-        figFile, axFile = plt.subplots(figsize=(12,5))
-        fileName = Path(file).stem # take only the name of the file without the '.wav' and the path
-        figFile.canvas.manager.set_window_title(fileName) # set title to the figure window
-        
-        time = np.arange(0, len(audio)/fs, 1/fs) # Time axis
-        duration = librosa.get_duration(filename=file)
-        self.addLoadButton(figFile, axFile, fs, time, audio, duration, fileName)
-
-        # Plot the audio file
-        axFile.plot(time, audio)
-        axFile.axhline(y=0, color='black', linewidth='0.5', linestyle='--') # draw an horizontal line in y=0.0
-        axFile.set(xlim=[0, max(time)], xlabel='Time (s)', ylabel='Waveform', title='Load an audio file')
-
-        plt.show() # show the figure
-
-    def addLoadButton(self, fig, ax, fs, time, audio, duration, name):
-        # Takes the selected fragment and opens the control menu when clicked
-        def load(event):
-            if self.selectedAudio.shape == (1,): 
-                self.cm.createControlMenu(name, fs, audio, duration, self.controller)
-            else:
-                time = np.arange(0, len(self.selectedAudio)/fs, 1/fs) # time array of the audio
-                durSelec = max(time) # duration of the selected fragment
-                self.cm.createControlMenu(name, fs, self.selectedAudio, durSelec, self.controller)
-            plt.close(fig)
-
-        # Adds a 'Load' button to the figure
-        axload = fig.add_axes([0.8, 0.01, 0.09, 0.05]) # [left, bottom, width, height]
-        but_load = Button(axload, 'Load')
-        but_load.on_clicked(load)
-        axload._but_load = but_load # reference to the Button (otherwise the button does nothing)
-
-        def listenFrag(xmin, xmax):
-            ini, end = np.searchsorted(time, (xmin, xmax))
-            self.selectedAudio = audio[ini:end+1]
-            sd.play(self.selectedAudio, fs)
             
-        self.span = SpanSelector(ax, listenFrag, 'horizontal', useblit=True, interactive=True, drag_from_anywhere=True)
+        self.file_path = file_path
+        
+        try:
+            # Read audio file
+            audio, self.fs = sf.read(file_path, dtype='float32')
+            
+            # Check if stereo and convert to mono if needed
+            with open(file_path, 'rb') as wav:
+                header_beginning = wav.read(0x18)
+                wavChannels, = struct.unpack_from('<H', header_beginning, 0x16)
+                if wavChannels > 1:
+                    QMessageBox.warning(
+                        self, 
+                        "Stereo File", 
+                        "This file is in stereo mode. It will be converted to mono."
+                    )
+                    ampMax = np.max(np.abs(audio))
+                    audio = np.sum(audio, axis=1)  # Convert to mono
+                    audio = audio * ampMax / np.max(np.abs(audio))  # Normalize
+            
+            self.plotAudio(audio)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not load file: {str(e)}")
+            
+    def plotAudio(self, audio):
+        self.ax.clear()
+        
+        # Calculate time array
+        duration = librosa.get_duration(filename=self.file_path)
+        time = np.linspace(0, duration, len(audio), endpoint=False)
+        
+        # Plot the audio
+        self.ax.plot(time, audio, linewidth=1)
+        self.ax.axhline(y=0, color='black', linewidth=0.5, linestyle='--')
+        self.ax.set(
+            xlim=[0, duration],
+            xlabel='Time (s)',
+            ylabel='Amplitude',
+            title=Path(self.file_path).stem
+        )
+        self.ax.grid(True, linestyle=':', alpha=0.5)
+        
+        # Add load button
+        self.addLoadButton()
+        
+        # Setup span selector for audio selection
+        self.setupSpanSelector(time, audio)
+        
+        self.canvas.draw()
+        
+    def setupSpanSelector(self, time, audio):
+        # Remove existing span selector if it exists
+        if hasattr(self, 'span'):
+            self.span.disconnect_events()
+            del self.span
+            
+        def on_select(xmin, xmax):
+            if len(audio) <= 1:
+                return
+                
+            idx_min = np.argmax(time >= xmin)
+            idx_max = np.argmax(time >= xmax)
+            self.selectedAudio = audio[idx_min:idx_max]
+            sd.play(self.selectedAudio, self.fs)
+            
+        self.span = SpanSelector(
+            self.ax,
+            on_select,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+        
+    def addLoadButton(self):
+        # Remove existing button if it exists
+        if hasattr(self, 'load_button_ax'):
+            self.fig.delaxes(self.load_button_ax)
+            
+        # Create button axes
+        self.load_button_ax = self.fig.add_axes([0.8, 0.01, 0.15, 0.05])
+        self.load_button = Button(self.load_button_ax, 'Load to Controller')
+        
+        def on_load(event):
+            if self.selectedAudio.shape == (1,):  # No selection, use entire audio
+                audio_to_load = self.ax.lines[0].get_ydata()
+                duration = librosa.get_duration(y=audio_to_load, sr=self.fs)
+            else:
+                audio_to_load = self.selectedAudio
+                duration = len(audio_to_load) / self.fs
+                
+            # Create control menu
+            name = Path(self.file_path).stem
+            cm = ControlMenu(name, self.fs, audio_to_load, duration, self.controller)
+            cm.show()
+            
+        self.load_button.on_clicked(on_load)
+        
+    def showHelp(self):
+        QMessageBox.information(
+            self, 
+            "Help", 
+            "Audio File Loader Help\n\n"
+            "1. Click 'Open Audio File' to browse for a WAV file\n"
+            "2. Select a portion of the audio with your mouse to play just that section\n"
+            "3. Click 'Load to Controller' to send the audio to the control menu\n"
+            "   - If no selection is made, the entire file will be loaded"
+        )
