@@ -7,6 +7,8 @@ from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, 
                             QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox)
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QVBoxLayout
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.widgets import SpanSelector, Button
@@ -50,11 +52,24 @@ class Load(QWidget):
         self.setLayout(main_layout)
         
     def loadAudio(self):
-        # Open file dialog
+        # Get the directory of the main window
+        main_window_dir = Path(self.master.window().windowFilePath()).parent if hasattr(self.master, 'window') else Path.cwd()
+        library_dir = main_window_dir / "library"
+        
+        # Create library directory if it doesn't exist
+        if not library_dir.exists():
+            library_dir.mkdir()
+            QMessageBox.information(
+                self,
+                "Library Directory Created",
+                f"The 'library' directory was created at:\n{library_dir}"
+            )
+        
+        # Open file dialog starting in the library directory
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             "Open Audio File", 
-            "", 
+            str(library_dir),  # Set initial directory to library
             "WAV Files (*.wav);;All Files (*)"
         )
         
@@ -148,15 +163,15 @@ class Load(QWidget):
         def on_load(event):
             if self.selectedAudio.shape == (1,):  # No selection, use entire audio
                 audio_to_load = self.ax.lines[0].get_ydata()
-                duration = librosa.get_duration(y=audio_to_load, sr=self.fs)
+                duration = len(audio_to_load) / self.fs  # Calculate duration from audio length
             else:
                 audio_to_load = self.selectedAudio
-                duration = len(audio_to_load) / self.fs
+                duration = len(audio_to_load) / self.fs  # Calculate duration from selected audio
                 
             # Create control menu
             name = Path(self.file_path).stem
             cm = ControlMenu(name, self.fs, audio_to_load, duration, self.controller)
-            cm.show()
+            cm.exec_()
             
         self.load_button.on_clicked(on_load)
         

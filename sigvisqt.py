@@ -18,6 +18,7 @@ from auxiliar import Auxiliar
 
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases
+from pitchAdvancedSettings import PitchAdvancedSettingsHandler
 
 # To avoid blurry fonts on Windows
 if sys.platform == "win32":
@@ -57,8 +58,7 @@ class Start(QMainWindow):
 
         # Initialize Help and AdvancedSettings
         self.help = Help(self.container, self)
-        #self.adse = AdvancedSettings(self.container, self)
-
+        self.adse = PitchAdvancedSettingsHandler(parent=self)
         # Set up the menu bar
         self.create_menu_bar()
 
