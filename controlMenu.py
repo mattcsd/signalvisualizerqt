@@ -100,7 +100,7 @@ class ControlMenu(QDialog):
         else:
             QMessageBox.warning(self, "Help", "Help system not available")
 
-            
+
     def create_spectrogram_group(self, layout):
         group = QGroupBox("Spectrogram")
         grid = QGridLayout()
@@ -495,57 +495,141 @@ class ControlMenu(QDialog):
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
     def plot_stft_spect(self):
-        wind_size = float(self.window_size.text())
-        overlap = float(self.overlap.text())
-        nfft = int(self.nfft.currentText())
-        min_freq = int(self.min_freq.text())
-        max_freq = int(self.max_freq.text())
-        draw_style = self.draw_style.currentIndex() + 1
-        
-        self.current_figure = plt.figure(figsize=(12,6))
-        ax1 = plt.subplot(311)
-        ax2 = plt.subplot(312)
-        ax3 = plt.subplot(313, sharex=ax1)
-        self.current_figure.suptitle('STFT + Spectrogram')
-        
-        wind_size_samples = int(wind_size * self.fs)
-        hop_size = wind_size_samples - int(overlap * self.fs)
-        window = self.get_window(wind_size_samples)
-        
-        audio_segment, (ini, end) = self.get_middle_segment(wind_size_samples)
-        audio_segment = audio_segment * window
-        
-        stft = np.fft.fft(audio_segment, nfft)[:int(nfft/2)]
-        freqs = np.arange(int(nfft/2)) * self.fs / nfft
-        
-        ax1.plot(self.time, self.audio)
-        ax1.axvspan(ini, end, color='silver', alpha=0.5)
-        
-        ax2.plot(freqs, 20*np.log10(abs(stft)))
-        ax2.set(xlim=[0, max(freqs)], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
-        
-        if draw_style == 1:
-            D = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size, 
-                            win_length=wind_size_samples, window=window)
-            S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
-            img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
-                                        sr=self.fs, hop_length=hop_size, 
-                                        fmin=min_freq, fmax=max_freq, ax=ax3)
-        else:
-            S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs, 
-                                            n_fft=nfft, hop_length=hop_size,
-                                            win_length=wind_size_samples, 
-                                            window=window, fmin=min_freq, 
-                                            fmax=max_freq)
-            S_db = librosa.power_to_db(S, ref=np.max)
-            img = librosa.display.specshow(S_db, x_axis='time', y_axis='mel',
-                                        sr=self.fs, hop_length=hop_size,
-                                        fmin=min_freq, fmax=max_freq, ax=ax3)
-        
-        self.current_figure.colorbar(img, ax=ax3, format="%+2.0f dB")
-        
-        self.show_plot_window()
+        """STFT + Spectrogram with interactive window selection"""
+        try:
+            wind_size = float(self.window_size.text())
+            overlap = float(self.overlap.text())
+            nfft = int(self.nfft.currentText())
+            min_freq = int(self.min_freq.text())
+            max_freq = int(self.max_freq.text())
+            draw_style = self.draw_style.currentIndex() + 1
+            
+            self.current_figure, (ax1, ax2, ax3) = plt.subplots(3, figsize=(12,6))
+            self.current_figure.suptitle('STFT + Spectrogram')
+            
+            # Ensure time and audio arrays match
+            if len(self.time) > len(self.audio):
+                self.time = self.time[:len(self.audio)]
+            elif len(self.audio) > len(self.time):
+                self.audio = self.audio[:len(self.time)]
+            
+            # STFT analysis properties
+            self.wind_size_samples = int(wind_size * self.fs)
+            self.hop_size = self.wind_size_samples - int(overlap * self.fs)
+            self.window = self.get_window(self.wind_size_samples)
+            self.nfft_val = nfft
+            self.mid_point_idx = len(self.audio) // 2  # Start in middle
+            
+            # Create initial spectrogram image and colorbar
+            if draw_style == 1:
+                D = librosa.stft(self.audio, n_fft=self.nfft_val, hop_length=self.hop_size,
+                                win_length=self.wind_size_samples, window=self.window)
+                self.S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
+                self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='linear',
+                                                sr=self.fs, hop_length=self.hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax3)
+            else:
+                S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
+                                                n_fft=self.nfft_val, hop_length=self.hop_size,
+                                                win_length=self.wind_size_samples,
+                                                window=self.window, fmin=min_freq,
+                                                fmax=max_freq)
+                self.S_db = librosa.power_to_db(S, ref=np.max)
+                self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='mel',
+                                                sr=self.fs, hop_length=self.hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax3)
+            
+            # Create colorbar once
+            self.cbar = self.current_figure.colorbar(self.img, ax=ax3, format="%+2.0f dB")
+            
+            # Initial plot
+            self.update_stft_spect_plot(ax1, ax2, ax3)
+            
+            # Set up interactions
+            self.span_selector = SpanSelector(
+                ax1,
+                self.on_span_select,
+                'horizontal',
+                useblit=True,
+                interactive=True,
+                drag_from_anywhere=True
+            )
+            
+            self.current_figure.canvas.mpl_connect(
+                'button_press_event', 
+                lambda e: self.on_window_click_spect(e, ax1, ax2, ax3)
+            )
+            
+            self.show_plot_window()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
+    def on_window_click_spect(self, event, ax1, ax2, ax3):
+        """Move analysis window on left click (without dragging)"""
+        if event.inaxes != ax1 or event.button != 1 or event.dblclick:
+            return
+        
+        # Only move window on simple click (not drag)
+        if hasattr(event, 'pressed') and event.pressed:
+            return
+            
+        # Update window center position
+        self.mid_point_idx = np.searchsorted(self.time, event.xdata)
+        self.update_stft_spect_plot(ax1, ax2, ax3)
+
+    def update_stft_spect_plot(self, ax1, ax2, ax3):
+        """Update plot with proper array handling"""
+        # Clear only the plots we need to update (not the spectrogram)
+        ax1.clear()
+        ax2.clear()
+        
+        # Current analysis window with boundary checks
+        start = max(0, self.mid_point_idx - self.wind_size_samples//2)
+        end = min(len(self.audio), self.mid_point_idx + self.wind_size_samples//2)
+        
+        # Get segments with exact matching lengths
+        time_segment = self.time[start:end]
+        audio_segment = self.audio[start:end]
+        window_segment = self.window[:len(audio_segment)]
+        
+        # Ensure perfect alignment
+        if len(audio_segment) < len(window_segment):
+            window_segment = window_segment[:len(audio_segment)]
+        elif len(window_segment) < len(audio_segment):
+            audio_segment = audio_segment[:len(window_segment)]
+            time_segment = time_segment[:len(window_segment)]
+        
+        windowed = audio_segment * window_segment
+        
+        # Compute STFT with padding if needed
+        if len(windowed) < self.nfft_val:
+            windowed = np.pad(windowed, (0, self.nfft_val - len(windowed)))
+        stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
+        freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
+        
+        # Plot time domain with highlighted window
+        ax1.plot(self.time, self.audio)
+        ax1.axvspan(time_segment[0], time_segment[-1], color='lightblue', alpha=0.3)
+        ax1.axvline(self.time[self.mid_point_idx], color='red', ls='--')
+        
+        # Plot STFT
+        ax2.plot(freqs, 20*np.log10(stft + 1e-10))
+        ax2.set(xlim=[0, self.fs/2], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
+        
+        # Update the spectrogram image data instead of recreating it
+        self.img.set_array(self.S_db)
+        self.img.autoscale()
+        
+        self.current_figure.canvas.draw()
+
+
+
+
+
+
+
+        
     def plot_ste(self):
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())

@@ -1,51 +1,24 @@
-import tkinter as tk
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel, 
+                            QPushButton, QRadioButton, QComboBox, QMessageBox,
+                            QButtonGroup)
+from PyQt5.QtCore import Qt
 import numpy as np
 import matplotlib.pyplot as plt
-from tkinter import ttk
-
 from auxiliar import Auxiliar
 
-import sys
-
-if sys.platform == "win32":
-    from ctypes import windll
-
-    # To avoid blurry fonts
-    from ctypes import windll
-    windll.shcore.SetProcessDpiAwareness(1)
-else:
-    windll = None  # Or handle it differently for macOS
-    
-class Spectrogram(tk.Frame):
-    def __init__(self, master, controller):
-        tk.Frame.__init__(self, master)
+class Spectrogram(QDialog):
+    def __init__(self, parent=None, controller=None):
+        super().__init__(parent)
         self.controller = controller
         self.aux = Auxiliar()
-        self.colormapMenu()
+        self.setupUI()
 
-    def colormapMenu(self):
-        cmm = tk.Toplevel()
-        cmm.resizable(True, True)
-        cmm.title('Choose colormap of the spectrogram')
-        cmm.iconbitmap('icons/icon.ico')
-        cmm.lift() # Place the toplevel window at the top
-        # self.aux.windowGeometry(cmm, 850, 250)
-
-        # Adapt the window to different sizes
-        for i in range(1):
-            cmm.columnconfigure(i, weight=1)
-
-        for i in range(7):
-            cmm.rowconfigure(i, weight=1)
-
-        # If the 'Control menu' window is closed, close also all the generated figures
-        def on_closing():
-            cmm.destroy()
-            plt.close('all') # closes all matplotlib figures
-        cmm.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # COLORMAPS
-        cmaps = [('Perceptually Uniform Sequential', [
+    def setupUI(self):
+        self.setWindowTitle('Choose colormap of the spectrogram')
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        
+        # Initialize colormap data
+        self.cmaps = [('Perceptually Uniform Sequential', [
                     'viridis', 'plasma', 'inferno', 'magma', 'cividis']),
                 ('Sequential', [
                     'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
@@ -68,184 +41,154 @@ class Spectrogram(tk.Frame):
                     'gnuplot', 'gnuplot2', 'CMRmap', 'cubehelix', 'brg',
                     'gist_rainbow', 'rainbow', 'jet', 'turbo', 'nipy_spectral',
                     'gist_ncar'])]
+
+        # Load current colormap from CSV with error handling
+        self.current_colormap = 'viridis'  # Default fallback
+        try:
+            csv_data = self.aux.readFromCsv()
+            if len(csv_data) > 5 and len(csv_data[5]) > 2:
+                self.current_colormap = csv_data[5][2]
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Could not load colormap preference: {str(e)}")
+
+        # Create UI elements
+        self.create_radio_buttons()
+        self.create_dropdowns()
+        self.create_buttons()
         
+        # Set initial state
+        self.set_initial_selection()
+        
+        # Layout setup
+        main_layout = QVBoxLayout()
+        grid_layout = QGridLayout()
+        
+        # Add widgets to grid
+        grid_layout.addWidget(self.rdb_pusq, 0, 0)
+        grid_layout.addWidget(self.dd_pusq, 1, 0)
+        grid_layout.addWidget(self.but_pusq, 1, 1)
+        
+        grid_layout.addWidget(self.rdb_sequ, 2, 0)
+        grid_layout.addWidget(self.dd_sequ, 3, 0)
+        grid_layout.addWidget(self.but_sequ, 3, 1)
+        
+        grid_layout.addWidget(self.rdb_seq2, 4, 0)
+        grid_layout.addWidget(self.dd_seq2, 5, 0)
+        grid_layout.addWidget(self.but_seq2, 5, 1)
+        
+        grid_layout.addWidget(self.rdb_dive, 6, 0)
+        grid_layout.addWidget(self.dd_dive, 7, 0)
+        grid_layout.addWidget(self.but_dive, 7, 1)
+        
+        grid_layout.addWidget(self.rdb_cycl, 8, 0)
+        grid_layout.addWidget(self.dd_cycl, 9, 0)
+        grid_layout.addWidget(self.but_cycl, 9, 1)
+        
+        grid_layout.addWidget(self.rdb_qual, 10, 0)
+        grid_layout.addWidget(self.dd_qual, 11, 0)
+        grid_layout.addWidget(self.but_qual, 11, 1)
+        
+        grid_layout.addWidget(self.rdb_misc, 12, 0)
+        grid_layout.addWidget(self.dd_misc, 13, 0)
+        grid_layout.addWidget(self.but_misc, 13, 1)
+        
+        main_layout.addLayout(grid_layout)
+        main_layout.addWidget(self.but_save)
+        self.setLayout(main_layout)
+
+    def create_radio_buttons(self):
+        self.rdb_pusq = QRadioButton('Perceptually Uniform Sequential')
+        self.rdb_sequ = QRadioButton('Sequential')
+        self.rdb_seq2 = QRadioButton('Sequential (2)')
+        self.rdb_dive = QRadioButton('Diverging')
+        self.rdb_cycl = QRadioButton('Cyclic')
+        self.rdb_qual = QRadioButton('Qualitative')
+        self.rdb_misc = QRadioButton('Miscellaneous')
+        
+        self.rdb_group = QButtonGroup()
+        self.rdb_group.addButton(self.rdb_pusq, 1)
+        self.rdb_group.addButton(self.rdb_sequ, 2)
+        self.rdb_group.addButton(self.rdb_seq2, 3)
+        self.rdb_group.addButton(self.rdb_dive, 4)
+        self.rdb_group.addButton(self.rdb_cycl, 5)
+        self.rdb_group.addButton(self.rdb_qual, 6)
+        self.rdb_group.addButton(self.rdb_misc, 7)
+        
+        self.rdb_group.buttonClicked.connect(self.update_dropdown_state)
+
+    def create_dropdowns(self):
+        self.dd_pusq = QComboBox()
+        self.dd_pusq.addItems(self.cmaps[0][1])
+        self.dd_sequ = QComboBox()
+        self.dd_sequ.addItems(self.cmaps[1][1])
+        self.dd_seq2 = QComboBox()
+        self.dd_seq2.addItems(self.cmaps[2][1])
+        self.dd_dive = QComboBox()
+        self.dd_dive.addItems(self.cmaps[3][1])
+        self.dd_cycl = QComboBox()
+        self.dd_cycl.addItems(self.cmaps[4][1])
+        self.dd_qual = QComboBox()
+        self.dd_qual.addItems(self.cmaps[5][1])
+        self.dd_misc = QComboBox()
+        self.dd_misc.addItems(self.cmaps[6][1])
+
+    def create_buttons(self):
+        self.but_pusq = QPushButton('Show colormap')
+        self.but_pusq.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[0]))
+        
+        self.but_sequ = QPushButton('Show colormap')
+        self.but_sequ.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[1]))
+        
+        self.but_seq2 = QPushButton('Show colormap')
+        self.but_seq2.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[2]))
+        
+        self.but_dive = QPushButton('Show colormap')
+        self.but_dive.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[3]))
+        
+        self.but_cycl = QPushButton('Show colormap')
+        self.but_cycl.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[4]))
+        
+        self.but_qual = QPushButton('Show colormap')
+        self.but_qual.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[5]))
+        
+        self.but_misc = QPushButton('Show colormap')
+        self.but_misc.clicked.connect(lambda: self.plot_color_gradients(self.cmaps[6]))
+        
+        self.but_save = QPushButton('Save')
+        self.but_save.clicked.connect(self.save_colormap)
+
+    def set_initial_selection(self):
+        # Find which category contains our current colormap
+        for i, (category, cmap_list) in enumerate(self.cmaps):
+            if self.current_colormap in cmap_list:
+                self.rdb_group.button(i+1).setChecked(True)
+                combo = getattr(self, f'dd_{["pusq", "sequ", "seq2", "dive", "cycl", "qual", "misc"][i]}')
+                combo.setCurrentText(self.current_colormap)
+                self.update_dropdown_state()
+                break
+
+    def update_dropdown_state(self):
+        selected_id = self.rdb_group.checkedId()
+        self.dd_pusq.setEnabled(selected_id == 1)
+        self.but_pusq.setEnabled(selected_id == 1)
+        self.dd_sequ.setEnabled(selected_id == 2)
+        self.but_sequ.setEnabled(selected_id == 2)
+        self.dd_seq2.setEnabled(selected_id == 3)
+        self.but_seq2.setEnabled(selected_id == 3)
+        self.dd_dive.setEnabled(selected_id == 4)
+        self.but_dive.setEnabled(selected_id == 4)
+        self.dd_cycl.setEnabled(selected_id == 5)
+        self.but_cycl.setEnabled(selected_id == 5)
+        self.dd_qual.setEnabled(selected_id == 6)
+        self.but_qual.setEnabled(selected_id == 6)
+        self.dd_misc.setEnabled(selected_id == 7)
+        self.but_misc.setEnabled(selected_id == 7)
+
+    def plot_color_gradients(self, cmap_category):
         gradient = np.linspace(0, 1, 256)
         gradient = np.vstack((gradient, gradient))
-
-        # Read the value of the colormap from a csv file
-        list = self.aux.readFromCsv()
-        choice = list[5][2]
-
-        for cmap_category, cmap_list in cmaps:
-            for i in range(len(cmap_list)):
-                if choice == cmap_list[i]:
-                    category = cmap_category
-                    index = i
-                    break
-
-        idx1, idx2, idx3, idx4, idx5, idx6, idx7 = 0, 0, 0, 0, 0, 0, 0
-
-        if category == 'Perceptually Uniform Sequential':
-            value = 1
-            idx1 = index
-        elif category == 'Sequential':
-            value = 2
-            idx2 = index
-        elif category == 'Sequential (2)':
-            value = 3
-            idx3 = index
-        elif category == 'Diverging':
-            value = 4
-            idx4 = index
-        elif category == 'Cyclic':
-            value = 5
-            idx5 = index
-        elif category == 'Qualitative':
-            value = 6
-            idx6 = index
-        elif category == 'Miscellaneous':
-            value = 7
-            idx7 = index
-
-        # OPTION MENUS
-        cmm.opt_pusq = cmaps[0][1]
-        cmm.opt_sequ = cmaps[1][1]
-        cmm.opt_seq2 = cmaps[2][1]
-        cmm.opt_dive = cmaps[3][1]
-        cmm.opt_cycl = cmaps[4][1]
-        cmm.opt_qual = cmaps[5][1]
-        cmm.opt_misc = cmaps[6][1]
-
-        cmm.var_pusq = tk.StringVar()
-        cmm.var_sequ = tk.StringVar()
-        cmm.var_seq2 = tk.StringVar()
-        cmm.var_dive = tk.StringVar()
-        cmm.var_cycl = tk.StringVar()
-        cmm.var_qual = tk.StringVar()
-        cmm.var_misc = tk.StringVar()
-
-        # creating option menus
-        dd_pusq = ttk.OptionMenu(cmm, cmm.var_pusq, cmm.opt_pusq[idx1], *cmm.opt_pusq)
-        dd_sequ = ttk.OptionMenu(cmm, cmm.var_sequ, cmm.opt_sequ[idx2], *cmm.opt_sequ)
-        dd_seq2 = ttk.OptionMenu(cmm, cmm.var_seq2, cmm.opt_seq2[idx3], *cmm.opt_seq2)
-        dd_dive = ttk.OptionMenu(cmm, cmm.var_dive, cmm.opt_dive[idx4], *cmm.opt_dive)
-        dd_cycl = ttk.OptionMenu(cmm, cmm.var_cycl, cmm.opt_cycl[idx5], *cmm.opt_cycl)
-        dd_qual = ttk.OptionMenu(cmm, cmm.var_qual, cmm.opt_qual[idx6], *cmm.opt_qual)
-        dd_misc = ttk.OptionMenu(cmm, cmm.var_misc, cmm.opt_misc[idx7], *cmm.opt_misc)
-
-        # size of the OptionMenus
-        dd_pusq.config(width=18)
-        dd_sequ.config(width=18)
-        dd_seq2.config(width=18)
-        dd_dive.config(width=18)
-        dd_cycl.config(width=18)
-        dd_qual.config(width=18)
-        dd_misc.config(width=18)
-
-        # positioning OptionMenus
-        dd_pusq.grid(column=0, row=1, sticky=tk.EW, padx=5)
-        dd_sequ.grid(column=0, row=3, sticky=tk.EW, padx=5)
-        dd_seq2.grid(column=0, row=5, sticky=tk.EW, padx=5)
-        dd_dive.grid(column=0, row=7, sticky=tk.EW, padx=5)
-        dd_cycl.grid(column=0, row=9, sticky=tk.EW, padx=5)
-        dd_qual.grid(column=0, row=11, sticky=tk.EW, padx=5)
-        dd_misc.grid(column=0, row=13, sticky=tk.EW, padx=5)
-
-        # RADIOBUTTONS
-        cmm.var_type = tk.IntVar(value=value)
-
-        def displayOptions(type):
-            if type == 1: 
-                dd_pusq.config(state='active')
-                but_pusq.configure(state='active')
-            else: 
-                dd_pusq.config(state='disabled')
-                but_pusq.configure(state='disabled')
-
-            if type == 2: 
-                dd_sequ.config(state='active')
-                but_sequ.configure(state='active')
-            else: 
-                dd_sequ.config(state='disabled')
-                but_sequ.configure(state='disabled')
-
-            if type == 3: 
-                dd_seq2.config(state='active')
-                but_seq2.configure(state='active')
-            else: 
-                dd_seq2.config(state='disabled')
-                but_seq2.configure(state='disabled')
-
-            if type == 4: 
-                dd_dive.config(state='active')
-                but_dive.configure(state='active')
-            else: 
-                dd_dive.config(state='disabled')
-                but_dive.configure(state='disabled')
-
-            if type == 5: 
-                dd_cycl.config(state='active')
-                but_cycl.configure(state='active')
-            else: 
-                dd_cycl.config(state='disabled')
-                but_cycl.configure(state='disabled')
-
-            if type == 6: 
-                dd_qual.config(state='active')
-                but_qual.configure(state='active')
-            else: 
-                dd_qual.config(state='disabled')
-                but_qual.configure(state='disabled')
-
-            if type == 7: 
-                dd_misc.config(state='active')
-                but_misc.configure(state='active')
-            else: 
-                dd_misc.config(state='disabled')
-                but_misc.configure(state='disabled')
-
-        rdb_pusq = tk.Radiobutton(cmm, variable=cmm.var_type, value=1, command=lambda: displayOptions(cmm.var_type.get()), text='Perceptually Uniform Sequential')
-        rdb_sequ = tk.Radiobutton(cmm, variable=cmm.var_type, value=2, command=lambda: displayOptions(cmm.var_type.get()), text='Sequential')
-        rdb_seq2 = tk.Radiobutton(cmm, variable=cmm.var_type, value=3, command=lambda: displayOptions(cmm.var_type.get()), text='Sequential (2)')
-        rdb_dive = tk.Radiobutton(cmm, variable=cmm.var_type, value=4, command=lambda: displayOptions(cmm.var_type.get()), text='Diverging')
-        rdb_cycl = tk.Radiobutton(cmm, variable=cmm.var_type, value=5, command=lambda: displayOptions(cmm.var_type.get()), text='Cyclic')
-        rdb_qual = tk.Radiobutton(cmm, variable=cmm.var_type, value=6, command=lambda: displayOptions(cmm.var_type.get()), text='Qualitative')
-        rdb_misc = tk.Radiobutton(cmm, variable=cmm.var_type, value=7, command=lambda: displayOptions(cmm.var_type.get()), text='Miscellaneous')
-           
-        # positioning Radiobuttons
-        rdb_pusq.grid(column=0, row=0, sticky=tk.W)
-        rdb_sequ.grid(column=0, row=2, sticky=tk.W)
-        rdb_seq2.grid(column=0, row=4, sticky=tk.W)
-        rdb_dive.grid(column=0, row=6, sticky=tk.W)
-        rdb_cycl.grid(column=0, row=8, sticky=tk.W)
-        rdb_qual.grid(column=0, row=10, sticky=tk.W)
-        rdb_misc.grid(column=0, row=12, sticky=tk.W)
-
-        # BUTTONS
-        but_pusq = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[0], cmaps[0][1], gradient))
-        but_sequ = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[1], cmaps[1][1], gradient))
-        but_seq2 = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[2], cmaps[2][1], gradient))
-        but_dive = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[3], cmaps[3][1], gradient))
-        but_cycl = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[4], cmaps[4][1], gradient))
-        but_qual = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[5], cmaps[5][1], gradient))
-        but_misc = ttk.Button(cmm, text='Show colormap', command=lambda: self.plot_color_gradients(cmaps[6], cmaps[6][1], gradient))
-        but_save = ttk.Button(cmm, text='Save', command=lambda: self.setColormap(cmm, list))
-
-        # positioning Buttons
-        but_pusq.grid(column=1, row=1, sticky=tk.EW, padx=5, pady=5)
-        but_sequ.grid(column=1, row=3, sticky=tk.EW, padx=5, pady=5)
-        but_seq2.grid(column=1, row=5, sticky=tk.EW, padx=5, pady=5)
-        but_dive.grid(column=1, row=7, sticky=tk.EW, padx=5, pady=5)
-        but_cycl.grid(column=1, row=9, sticky=tk.EW, padx=5, pady=5)
-        but_qual.grid(column=1, row=11, sticky=tk.EW, padx=5, pady=5)
-        but_misc.grid(column=1, row=13, sticky=tk.EW, padx=5, pady=5)
-        but_save.grid(column=1, row=15, sticky=tk.EW, padx=5, pady=5)
-
-        # Put the readen value from the csv file as the default value
-        displayOptions(value)
-
-    def plot_color_gradients(self, cmap_category, cmap_list, gradient):
-        # Create figure and adjust figure height to number of colormaps
+        
+        cmap_list = cmap_category[1]
         nrows = len(cmap_list)
         figh = 0.35 + 0.15 + (nrows + (nrows-1)*0.1)*0.22
         fig, axs = plt.subplots(nrows=nrows, figsize=(6.4, figh))
@@ -258,36 +201,46 @@ class Spectrogram(tk.Frame):
             ax.text(-.01, .5, cmap_name, va='center', ha='right', fontsize=10,
                     transform=ax.transAxes)
 
-        # Turn off *all* ticks & spines, not just the ones with colormaps.
         for ax in axs:
             ax.set_axis_off()
 
         plt.show()
 
-    def setColormap(self, cmm, list):
-        type = cmm.var_type.get()
+    def save_colormap(self):
+        try:
+            selected_id = self.rdb_group.checkedId()
+            if selected_id == 1:
+                choice = self.dd_pusq.currentText()
+            elif selected_id == 2:
+                choice = self.dd_sequ.currentText()
+            elif selected_id == 3:
+                choice = self.dd_seq2.currentText()
+            elif selected_id == 4:
+                choice = self.dd_dive.currentText()
+            elif selected_id == 5:
+                choice = self.dd_cycl.currentText()
+            elif selected_id == 6:
+                choice = self.dd_qual.currentText()
+            elif selected_id == 7:
+                choice = self.dd_misc.currentText()
+            else:
+                choice = 'viridis'  # fallback
 
-        if type == 1:
-            choice = cmm.var_pusq.get()
-        elif type == 2: 
-            choice = cmm.var_sequ.get()
-        elif type == 3: 
-            choice = cmm.var_seq2.get()
-        elif type == 4: 
-            choice = cmm.var_dive.get()
-        elif type == 5: 
-            choice = cmm.var_cycl.get()
-        elif type == 6: 
-            choice = cmm.var_qual.get()
-        elif type == 7: 
-            choice = cmm.var_misc.get()
-
-        new_list = [['NOISE','\t duration', list[0][2],'\t amplitude', list[0][4],'\t fs', list[0][6],'\t noise type', list[0][8]],
-                ['PURE TONE','\t duration', list[1][2],'\t amplitude', list[1][4],'\t fs', list[1][6],'\t offset', list[1][8],'\t frequency', list[1][10],'\t phase',  list[1][12]],
-                ['SQUARE WAVE','\t duration', list[2][2],'\t amplitude', list[2][4],'\t fs', list[2][6],'\t offset', list[2][8],'\t frequency', list[2][10],'\t phase', list[2][12],'\t active cycle', list[2][14]],
-                ['SAWTOOTH WAVE','\t duration', list[3][2],'\t amplitude', list[3][4],'\t fs', list[3][6],'\t offset', list[3][8],'\t frequency', list[3][10],'\t phase', list[3][12],'\t max position', list[3][14]],
-                ['FREE ADD OF PT','\t duration', list[4][2],'\t octave', list[4][4],'\t freq1', list[4][6],'\t freq2', list[4][8],'\t freq3', list[4][10],'\t freq4', list[4][12],'\t freq5', list[4][14],'\t freq6', list[4][16],'\t amp1', list[4][18],'\t amp2', list[4][20],'\t amp3', list[4][22],'\t amp4', list[4][24],'\t amp5', list[4][26],'\t amp6', list[4][28]],
-                ['SPECTROGRAM','\t colormap', choice]]
-        self.aux.saveDefaultAsCsv(new_list)
-        cmm.destroy() # close window
-        plt.close('all') # closes all matplotlib figures
+            # Read current CSV data
+            csv_data = self.aux.readFromCsv()
+            
+            # Ensure proper data structure
+            while len(csv_data) < 6:
+                csv_data.append([])
+            while len(csv_data[5]) < 3:
+                csv_data[5].append("")
+                
+            csv_data[5][2] = choice
+            self.aux.saveDefaultAsCsv(csv_data)
+            
+            QMessageBox.information(self, "Saved", "Colormap preference saved successfully")
+            self.close()
+            plt.close('all')
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save colormap: {str(e)}")
