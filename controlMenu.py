@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
+from PyQt5.QtWidgets import ( QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 import matplotlib.pyplot as plt
 from PyQt5.QtGui import QDoubleValidator
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -16,6 +16,7 @@ import matplotlib as mpl
 from pitchAdvancedSettings import AdvancedSettings
 from PyQt5.QtWidgets import QVBoxLayout
 from scipy.io.wavfile import write
+from help import Help
 
 
 class ControlMenu(QDialog):
@@ -42,7 +43,7 @@ class ControlMenu(QDialog):
         main_layout.setVerticalSpacing(8)
         main_layout.setHorizontalSpacing(10)
         
-        # Analysis method selector - placed above all groups
+        # Analysis method selector
         self.method_selector = QComboBox()
         self.method_selector.addItems([
             'FT', 'STFT', 'Spectrogram', 'STFT + Spect', 
@@ -62,14 +63,44 @@ class ControlMenu(QDialog):
         self.plot_button.clicked.connect(self.plot_figure)
         main_layout.addWidget(self.plot_button, 14, 3, 1, 1)
         
+        # Help button setup
         self.help_button = QPushButton('🛈')
         self.help_button.setFixedWidth(30)
-        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(8))
+        self.help_button.clicked.connect(self.show_help)
         main_layout.addWidget(self.help_button, 14, 2, 1, 1, Qt.AlignRight)
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
 
+    def show_help(self):
+        """Properly shows and activates the help window"""
+        if hasattr(self.controller, 'help'):
+            # Ensure the help window is properly parented
+            if not self.controller.help.parent():
+                self.controller.help.setParent(self)
+                
+            # Force the window to appear in front
+            self.controller.help.setWindowFlags(
+                self.controller.help.windowFlags() | 
+                Qt.WindowStaysOnTopHint
+            )
+            self.controller.help.show()
+            self.controller.help.raise_()
+            self.controller.help.activateWindow()
+            
+            # Remove the always-on-top hint after showing
+            self.controller.help.setWindowFlags(
+                self.controller.help.windowFlags() & 
+                ~Qt.WindowStaysOnTopHint
+            )
+            self.controller.help.show()
+            
+            # Load the help content
+            self.controller.help.createHelpMenu(8)
+        else:
+            QMessageBox.warning(self, "Help", "Help system not available")
+
+            
     def create_spectrogram_group(self, layout):
         group = QGroupBox("Spectrogram")
         grid = QGridLayout()
