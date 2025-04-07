@@ -57,9 +57,9 @@ class ControlMenu(QDialog):
         self.create_pitch_group(main_layout)
         self.create_filter_group(main_layout)
         
-        #self.filter_response_button = QPushButton('Show Filter Response')
-        #self.filter_response_button.clicked.connect(self.plot_filter_response)
-        #main_layout.addWidget(self.filter_response_button, 8, 2, 1, 2)
+        self.filter_response_button = QPushButton('Show Filter Response')
+        self.filter_response_button.clicked.connect(self.plot_filter_response)
+        main_layout.addWidget(self.filter_response_button, 8, 2, 1, 2)
         
         self.create_ste_group(main_layout)
         
@@ -264,35 +264,59 @@ class ControlMenu(QDialog):
         layout.addWidget(group, 9, 2, 5, 2)
         
     def update_ui_state(self, method):
-        """Update UI state based on selected analysis method"""
-        # Enable/disable controls according to original Tkinter logic
-        self.window_type.setEnabled(method in ['STFT', 'Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Short-Time-Energy'])
-        self.window_size.setEnabled(method not in ['FT', 'Pitch', 'Filtering'])
-        self.overlap.setEnabled(method in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Short-Time-Energy'])
-        self.nfft.setEnabled(method in ['STFT', 'Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
-        self.min_freq.setEnabled(method in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
-        self.max_freq.setEnabled(method in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid'])
-        self.draw_style.setEnabled(method in ['Spectrogram', 'STFT + Spect', 'Spectral Centroid', 'Filtering'])
-        self.show_pitch.setEnabled(method == 'Spectrogram')
+        # First define all the mode flags
+        ft_enabled = method == 'FT'
+        stft_enabled = method == 'STFT'
+        spectrogram_enabled = method == 'Spectrogram'
+        stft_spect_enabled = method == 'STFT + Spect'
+        ste_enabled = method == 'Short-Time-Energy'
+        pitch_enabled = method == 'Pitch'
+        spectral_centroid_enabled = method == 'Spectral Centroid'
+        filtering_enabled = method == 'Filtering'
         
-        # Pitch controls
-        pitch_active = method == 'Pitch'
-        self.pitch_method.setEnabled(pitch_active)
-        self.min_pitch.setEnabled(pitch_active)
-        self.max_pitch.setEnabled(pitch_active)
-        self.adv_settings.setEnabled(pitch_active)
-        
-        # Filter controls
-        filter_active = method == 'Filtering'
-        self.filter_type.setEnabled(filter_active)
-        if filter_active:
-            self.update_filter_ui(self.filter_type.currentText())
+        # Spectrogram controls
+        self.window_type.setEnabled(stft_enabled or spectrogram_enabled or stft_spect_enabled or 
+                                  spectral_centroid_enabled or ste_enabled)
+        self.window_size.setEnabled(not ft_enabled and not pitch_enabled and not filtering_enabled)
+        self.overlap.setEnabled(spectrogram_enabled or stft_spect_enabled or 
+                               spectral_centroid_enabled or ste_enabled)
+        self.nfft.setEnabled(stft_enabled or spectrogram_enabled or stft_spect_enabled or 
+                            spectral_centroid_enabled or ste_enabled)
+        self.min_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or spectral_centroid_enabled)
+        self.max_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or spectral_centroid_enabled)
+        self.draw_style.setEnabled(spectrogram_enabled or stft_spect_enabled or 
+                                 spectral_centroid_enabled or filtering_enabled)
+        self.show_pitch.setEnabled(spectrogram_enabled)
         
         # STE controls
-        ste_active = method == 'Short-Time-Energy'
-        self.beta.setEnabled(ste_active and self.window_type.currentText() == 'Kaiser')
+        if ste_enabled and self.window_type.currentText() == 'Kaiser':
+            self.beta.setEnabled(True)
+        else:
+            self.beta.setEnabled(False)
+            
+        # Pitch controls
+        pitch_controls_enabled = pitch_enabled or (spectrogram_enabled and self.show_pitch.isChecked())
+        self.pitch_method.setEnabled(pitch_controls_enabled)
+        self.min_pitch.setEnabled(pitch_controls_enabled)
+        self.max_pitch.setEnabled(pitch_controls_enabled)
+        self.adv_settings.setEnabled(pitch_controls_enabled)
         
-        def plot_filter_response(self):
+        # Filter controls
+        self.filter_type.setEnabled(filtering_enabled)
+        self.fund_freq.setEnabled(False)
+        self.center_freq.setEnabled(False)
+        self.percentage.setEnabled(False)
+        self.fcut.setEnabled(False)
+        self.fcut1.setEnabled(False)
+        self.fcut2.setEnabled(False)
+        
+        if filtering_enabled:
+            self.update_filter_ui(self.filter_type.currentText())
+        
+        self.filter_response_button.setEnabled(filtering_enabled)
+
+
+    def plot_filter_response(self):
             filter_type = self.filter_type.currentText()
             percentage = float(self.percentage.text())
             
@@ -366,7 +390,6 @@ class ControlMenu(QDialog):
             ax2.grid(True)
             
             self.show_plot_window()
-
 
     # [Rest of your methods remain unchanged...]
         # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
@@ -750,12 +773,17 @@ class ControlMenu(QDialog):
         window_type = self.window_type.currentText()
         beta = float(self.beta.text()) if window_type == 'Kaiser' else 0
         
-        self.current_figure, ax = plt.subplots(2, figsize=(12,6))
+        self.current_figure, ax = plt.subplots(2, figsize=(12,6), sharex=True)
         self.current_figure.suptitle('Short-Time Energy')
+        
+        # Hide x labels and tick labels for all but bottom plot
+        for a in ax:
+            a.label_outer()
         
         wind_size_samples = int(wind_size * self.fs)
         hop_size = wind_size_samples - int(overlap * self.fs)
         
+        # Get window function
         if window_type == 'Bartlett':
             window = np.bartlett(wind_size_samples)
         elif window_type == 'Blackman':
@@ -767,17 +795,25 @@ class ControlMenu(QDialog):
         elif window_type == 'Kaiser':
             window = np.kaiser(wind_size_samples, beta)
         
-        ste = np.zeros(len(self.audio))
+        # Calculate STE with proper hop size and dB conversion
+        ste = []
+        time_points = []
         for i in range(0, len(self.audio) - wind_size_samples, hop_size):
             segment = self.audio[i:i+wind_size_samples] * window
-            ste[i:i+wind_size_samples] += segment**2
+            energy = 10 * np.log10(np.mean(segment**2))  # Convert to dB
+            ste.append(energy)
+            time_points.append(self.time[i + wind_size_samples//2])  # Center time point
         
+        # Plot original waveform
         ax[0].plot(self.time, self.audio)
-        ax[1].plot(self.time, ste)
-        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Energy')
+        ax[0].set(ylabel='Amplitude')
+        
+        # Plot STE in dB
+        ax[1].plot(time_points, ste)
+        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window()
-
+        
     def plot_pitch(self):
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
