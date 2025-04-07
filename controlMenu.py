@@ -452,22 +452,32 @@ class ControlMenu(QDialog):
             draw_style = self.draw_style.currentIndex() + 1
             show_pitch = self.show_pitch.isChecked()
             
-            self.current_figure = plt.figure(figsize=(12,6))
-            gs = self.current_figure.add_gridspec(2, hspace=0, height_ratios=[1, 3])
-            ax = gs.subplots(sharex=True)
-            self.current_figure.suptitle('Spectrogram')
+            # Create figure with adjusted layout
+            self.current_figure = plt.figure(figsize=(12, 6))
+            gs = plt.GridSpec(2, 2, width_ratios=[15, 1], height_ratios=[1, 3], 
+                             hspace=0.1, wspace=0.05)
+            ax0 = plt.subplot(gs[0, 0])  # Waveform
+            ax1 = plt.subplot(gs[1, 0], sharex=ax0)  # Spectrogram
+            cbar_ax = plt.subplot(gs[:, 1])  # Colorbar
+            
+            self.current_figure.suptitle('Spectrogram', y=0.98)
             
             wind_size_samples = int(wind_size * self.fs)
             hop_size = wind_size_samples - int(overlap * self.fs)
             window = self.get_window(wind_size_samples)
             
+            # Plot waveform
+            ax0.plot(self.time, self.audio)
+            ax0.set(ylabel='Amplitude')
+            
+            # Create spectrogram
             if draw_style == 1:
                 D = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size, 
                                 win_length=wind_size_samples, window=window)
                 S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
                                             sr=self.fs, hop_length=hop_size, 
-                                            fmin=min_freq, fmax=max_freq, ax=ax[1])
+                                            fmin=min_freq, fmax=max_freq, ax=ax1)
             else:
                 S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs, 
                                                 n_fft=nfft, hop_length=hop_size,
@@ -477,23 +487,26 @@ class ControlMenu(QDialog):
                 S_db = librosa.power_to_db(S, ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='mel',
                                             sr=self.fs, hop_length=hop_size,
-                                            fmin=min_freq, fmax=max_freq, ax=ax[1])
+                                            fmin=min_freq, fmax=max_freq, ax=ax1)
             
-            self.current_figure.colorbar(img, ax=ax[1], format="%+2.0f dB")
+            # Add colorbar to dedicated axis
+            self.current_figure.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
             
+            # Add pitch contour if enabled
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
-                ax[1].plot(pitch.xs(), pitch_values, '-', color='white')
+                ax1.plot(pitch.xs(), pitch_values, '-', color='white')
             
-            # Set matching x-axis limits for both subplots
-            ax[0].plot(self.time, self.audio)
-            ax[0].set(xlim=[0, self.duration], ylabel='Amplitude')
-            ax[1].set(xlim=[0, self.duration])  # Explicitly set spectrogram limits
+            # Set matching x-axis limits
+            ax0.set(xlim=[0, self.duration])
+            ax1.set(xlim=[0, self.duration])
             
             self.show_plot_window()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
+
+        
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection"""
         try:
@@ -504,8 +517,15 @@ class ControlMenu(QDialog):
             max_freq = int(self.max_freq.text())
             draw_style = self.draw_style.currentIndex() + 1
             
-            self.current_figure, (ax1, ax2, ax3) = plt.subplots(3, figsize=(12,6))
-            self.current_figure.suptitle('STFT + Spectrogram')
+            # Create figure with adjusted layout - taller spectrogram
+            self.current_figure = plt.figure(figsize=(12, 8))  # Increased figure height (from 6 to 8)
+            gs = plt.GridSpec(3, 2, width_ratios=[15, 1], height_ratios=[1, 1, 1.5], hspace=0.4)
+            ax1 = plt.subplot(gs[0, 0])
+            ax2 = plt.subplot(gs[1, 0])
+            ax3 = plt.subplot(gs[2, 0], sharex=ax1)  # Share x-axis with ax1
+            cbar_ax = plt.subplot(gs[:, 1])  # Colorbar uses entire right column
+            
+            self.current_figure.suptitle('STFT + Spectrogram', y=0.98)  # Adjust title position
             
             # Ensure time and audio arrays match
             if len(self.time) > len(self.audio):
@@ -520,7 +540,7 @@ class ControlMenu(QDialog):
             self.nfft_val = nfft
             self.mid_point_idx = len(self.audio) // 2  # Start in middle
             
-            # Create initial spectrogram image and colorbar
+            # Create initial spectrogram image
             if draw_style == 1:
                 D = librosa.stft(self.audio, n_fft=self.nfft_val, hop_length=self.hop_size,
                                 win_length=self.wind_size_samples, window=self.window)
@@ -539,8 +559,12 @@ class ControlMenu(QDialog):
                                                 sr=self.fs, hop_length=self.hop_size,
                                                 fmin=min_freq, fmax=max_freq, ax=ax3)
             
-            # Create colorbar once
-            self.cbar = self.current_figure.colorbar(self.img, ax=ax3, format="%+2.0f dB")
+            # Make spectrogram labels more readable
+            ax3.set_ylabel('Frequency (Hz)', fontsize=10)
+            ax3.tick_params(axis='both', which='major', labelsize=8)
+            
+            # Create colorbar once on the dedicated axis
+            self.cbar = self.current_figure.colorbar(self.img, cax=cbar_ax, format="%+2.0f dB")
             
             # Initial plot
             self.update_stft_spect_plot(ax1, ax2, ax3)
@@ -564,6 +588,12 @@ class ControlMenu(QDialog):
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
+
+
+
+
+
+
 
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
@@ -629,7 +659,7 @@ class ControlMenu(QDialog):
 
 
 
-        
+
     def plot_ste(self):
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
