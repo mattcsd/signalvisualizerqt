@@ -43,7 +43,6 @@ class ControlMenu(QDialog):
         main_layout.setVerticalSpacing(8)
         main_layout.setHorizontalSpacing(10)
         
-        # Analysis method selector
         self.method_selector = QComboBox()
         self.method_selector.addItems([
             'FT', 'STFT', 'Spectrogram', 'STFT + Spect', 
@@ -57,13 +56,17 @@ class ControlMenu(QDialog):
         self.create_spectrogram_group(main_layout)
         self.create_pitch_group(main_layout)
         self.create_filter_group(main_layout)
+        
+        #self.filter_response_button = QPushButton('Show Filter Response')
+        #self.filter_response_button.clicked.connect(self.plot_filter_response)
+        #main_layout.addWidget(self.filter_response_button, 8, 2, 1, 2)
+        
         self.create_ste_group(main_layout)
         
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self.plot_figure)
         main_layout.addWidget(self.plot_button, 14, 3, 1, 1)
-        
-        # Help button setup
+     
         self.help_button = QPushButton('🛈')
         self.help_button.setFixedWidth(30)
         self.help_button.clicked.connect(self.show_help)
@@ -71,6 +74,7 @@ class ControlMenu(QDialog):
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
+
 
     def show_help(self):
         """Properly shows and activates the help window"""
@@ -126,6 +130,7 @@ class ControlMenu(QDialog):
         self.nfft = QComboBox()
         nfft_values = [2**i for i in range(9, 20)]
         self.nfft.addItems(map(str, nfft_values))
+        self.nfft.setCurrentText("2048")
         
         self.min_freq = QLineEdit("0")
         self.max_freq = QLineEdit(str(self.fs//2))
@@ -180,7 +185,6 @@ class ControlMenu(QDialog):
         layout.addWidget(group, 9, 0, 5, 2)
 
     def toggle_pitch_controls(self, state):
-        """Enable/disable pitch controls based on checkbox state"""
         enabled = state == Qt.Checked
         self.pitch_method.setEnabled(enabled)
         self.min_pitch.setEnabled(enabled)
@@ -236,13 +240,13 @@ class ControlMenu(QDialog):
         layout.addWidget(group, 1, 2, 7, 2)
         
     def update_filter_ui(self, filter_type):
-        """Update filter UI based on selected filter type"""
         harmonic = filter_type == 'Harmonic'
         lphp = filter_type in ['Lowpass', 'Highpass']
         bpbs = filter_type in ['Bandpass', 'Bandstop']
         
         self.fund_freq.setEnabled(harmonic)
         self.center_freq.setEnabled(harmonic)
+        self.percentage.setEnabled(True)
         self.fcut.setEnabled(lphp)
         self.fcut1.setEnabled(bpbs)
         self.fcut2.setEnabled(bpbs)
@@ -257,7 +261,7 @@ class ControlMenu(QDialog):
         grid.addWidget(self.beta, 0, 1)
         
         group.setLayout(grid)
-        layout.addWidget(group, 8, 2, 6, 2)
+        layout.addWidget(group, 9, 2, 5, 2)
         
     def update_ui_state(self, method):
         """Update UI state based on selected analysis method"""
@@ -288,6 +292,80 @@ class ControlMenu(QDialog):
         ste_active = method == 'Short-Time-Energy'
         self.beta.setEnabled(ste_active and self.window_type.currentText() == 'Kaiser')
         
+        def plot_filter_response(self):
+            filter_type = self.filter_type.currentText()
+            percentage = float(self.percentage.text())
+            
+            if filter_type == 'Lowpass' or filter_type == 'Highpass':
+                fcut = float(self.fcut.text())
+                delta = fcut * (percentage / 100)
+                
+                if filter_type == 'Lowpass':
+                    wp = fcut - delta
+                    ws = fcut + delta
+                else:
+                    wp = fcut + delta
+                    ws = fcut - delta
+                    
+                N, Wn = signal.ellipord(wp, ws, 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
+                
+            elif filter_type == 'Harmonic':
+                fund_freq = float(self.fund_freq.text())
+                center_freq = float(self.center_freq.text())
+                fc = fund_freq * center_freq
+                fcut1 = fc - center_freq/2
+                fcut2 = fc + center_freq/2
+                delta1 = fcut1 * (percentage / 100)
+                delta2 = fcut2 * (percentage / 100)
+                
+                wp1 = fcut1 + delta1
+                wp2 = fcut2 - delta2
+                ws1 = fcut1 - delta1
+                ws2 = fcut2 + delta2
+                
+                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype='bandpass', fs=self.fs)
+                
+            else:  # Bandpass or Bandstop
+                fcut1 = float(self.fcut1.text())
+                fcut2 = float(self.fcut2.text())
+                delta1 = fcut1 * (percentage / 100)
+                delta2 = fcut2 * (percentage / 100)
+                
+                if filter_type == 'Bandpass':
+                    wp1 = fcut1 + delta1
+                    wp2 = fcut2 - delta2
+                    ws1 = fcut1 - delta1
+                    ws2 = fcut2 + delta2
+                else:
+                    wp1 = fcut1 - delta1
+                    wp2 = fcut2 + delta2
+                    ws1 = fcut1 + delta1
+                    ws2 = fcut2 - delta2
+                    
+                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
+            
+            w, h = signal.freqz(b, a, worN=8000, fs=self.fs)
+            phase = np.unwrap(np.angle(h))
+            
+            self.current_figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+            self.current_figure.suptitle(f'Filter Frequency Response ({filter_type})')
+            
+            ax1.plot(w, 20 * np.log10(abs(h)))
+            ax1.set_title('Magnitude Response')
+            ax1.set_ylabel('Amplitude [dB]')
+            ax1.set_xlabel('Frequency [Hz]')
+            ax1.grid(True)
+            
+            ax2.plot(w, phase)
+            ax2.set_title('Phase Response')
+            ax2.set_ylabel('Phase [radians]')
+            ax2.set_xlabel('Frequency [Hz]')
+            ax2.grid(True)
+            
+            self.show_plot_window()
 
 
     # [Rest of your methods remain unchanged...]
@@ -452,6 +530,11 @@ class ControlMenu(QDialog):
             draw_style = self.draw_style.currentIndex() + 1
             show_pitch = self.show_pitch.isChecked()
             
+            # Ensure audio and time arrays match exactly
+            min_length = min(len(self.audio), len(self.time))
+            audio = self.audio[:min_length]
+            time = self.time[:min_length]
+            
             # Create figure with adjusted layout
             self.current_figure = plt.figure(figsize=(12, 6))
             gs = plt.GridSpec(2, 2, width_ratios=[15, 1], height_ratios=[1, 3], 
@@ -467,19 +550,19 @@ class ControlMenu(QDialog):
             window = self.get_window(wind_size_samples)
             
             # Plot waveform
-            ax0.plot(self.time, self.audio)
+            ax0.plot(time, audio)
             ax0.set(ylabel='Amplitude')
             
             # Create spectrogram
             if draw_style == 1:
-                D = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size, 
+                D = librosa.stft(audio, n_fft=nfft, hop_length=hop_size, 
                                 win_length=wind_size_samples, window=window)
                 S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
                                             sr=self.fs, hop_length=hop_size, 
                                             fmin=min_freq, fmax=max_freq, ax=ax1)
             else:
-                S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs, 
+                S = librosa.feature.melspectrogram(y=audio, sr=self.fs, 
                                                 n_fft=nfft, hop_length=hop_size,
                                                 win_length=wind_size_samples, 
                                                 window=window, fmin=min_freq, 
@@ -495,18 +578,19 @@ class ControlMenu(QDialog):
             # Add pitch contour if enabled
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
-                ax1.plot(pitch.xs(), pitch_values, '-', color='white')
+                # Ensure pitch values match time points
+                pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
+                ax1.plot(pitch_times, pitch_values, '-', color='white')
             
             # Set matching x-axis limits
-            ax0.set(xlim=[0, self.duration])
-            ax1.set(xlim=[0, self.duration])
+            ax0.set(xlim=[0, time[-1]])
+            ax1.set(xlim=[0, time[-1]])
             
             self.show_plot_window()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
 
-        
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection"""
         try:
