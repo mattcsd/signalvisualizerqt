@@ -170,9 +170,18 @@ class Load(QWidget):
                 
             # Create control menu
             name = Path(self.file_path).stem
-            cm = ControlMenu(name, self.fs, audio_to_load, duration, self.controller)
-            cm.exec_()
             
+
+            # Create and show window
+            self.control_menu_ref = ControlMenu(name, self.fs, audio_to_load, duration, self.controller)
+            
+            # Force window to front
+            self.control_menu_ref.show()
+            self.control_menu_ref.raise_()
+            self.control_menu_ref.activateWindow()
+
+            print("Show called")  # Debug
+
         self.load_button.on_clicked(on_load)
         
     def showHelp(self):

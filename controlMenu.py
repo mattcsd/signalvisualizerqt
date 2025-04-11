@@ -21,7 +21,7 @@ from help import Help
 
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
-        super().__init__()
+        super().__init__(None)
         self.fileName = name
         self.audio = audio
         self.fs = fs
@@ -31,10 +31,22 @@ class ControlMenu(QDialog):
         self.controller = controller
         self.current_figure = None
         
+
+        # CRITICAL SETTINGS (add these):
+        self.setWindowTitle(f"Controller - {name}")
+        self.setMinimumSize(800, 600)  # Force reasonable size
+        self.setModal(False)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        
+        # This is the magic flag combination that always works:
+        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+
         np.seterr(divide='ignore')
         self.span = None
         self.setupUI()
         
+        print("PAST CONSTRUCTOR")
+
     def setupUI(self):
         self.setWindowTitle(self.fileName)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
@@ -813,7 +825,7 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window()
-        
+
     def plot_pitch(self):
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
