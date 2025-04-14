@@ -15,6 +15,8 @@ from matplotlib.widgets import SpanSelector, Button
 from matplotlib.figure import Figure
 from controlMenu import ControlMenu
 
+MAX_WINDOWS = 5 
+
 class Load(QWidget):
     def __init__(self, master, controller):
         super().__init__(master)
@@ -23,6 +25,9 @@ class Load(QWidget):
         self.selectedAudio = np.empty(1)
         self.fs = 44100  # Default sample rate
         self.file_path = ""
+
+        self.control_windows = []  # List to track all open control windows
+        self.selected_span = (0, 0)  # Track selected time span
         
         self.setupUI()
         
@@ -140,6 +145,7 @@ class Load(QWidget):
             idx_min = np.argmax(time >= xmin)
             idx_max = np.argmax(time >= xmax)
             self.selectedAudio = audio[idx_min:idx_max]
+            self.selected_span = (xmin, xmax)  # Store the selected span
             sd.play(self.selectedAudio, self.fs)
             
         self.span = SpanSelector(
@@ -150,7 +156,14 @@ class Load(QWidget):
             interactive=True,
             drag_from_anywhere=True
         )
-        
+
+    def format_timestamp(self, seconds):
+        """Convert seconds to mm:ss format"""
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Shows mm:ss.xx
+
+
     def addLoadButton(self):
         # Remove existing button if it exists
         if hasattr(self, 'load_button_ax'):
@@ -161,26 +174,38 @@ class Load(QWidget):
         self.load_button = Button(self.load_button_ax, 'Load to Controller')
         
         def on_load(event):
+            if len(self.control_windows) >= MAX_WINDOWS:
+                oldest = self.control_windows.pop(0)
+                oldest.close()
             if self.selectedAudio.shape == (1,):  # No selection, use entire audio
                 audio_to_load = self.ax.lines[0].get_ydata()
-                duration = len(audio_to_load) / self.fs  # Calculate duration from audio length
+                duration = len(audio_to_load) / self.fs
+                start_time = 0
+                end_time = duration
             else:
                 audio_to_load = self.selectedAudio
-                duration = len(audio_to_load) / self.fs  # Calculate duration from selected audio
+                duration = len(audio_to_load) / self.fs
+                start_time, end_time = self.selected_span
                 
-            # Create control menu
+            # Create window title with span
             name = Path(self.file_path).stem
+            if self.selectedAudio.shape != (1,):  # Only show span if selection was made
+                title = f"{name} {self.format_timestamp(start_time)}-{self.format_timestamp(end_time)}"
+            else:
+                title = name
+                
+            # Create new control window
+            control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
             
-
-            # Create and show window
-            self.control_menu_ref = ControlMenu(name, self.fs, audio_to_load, duration, self.controller)
+            # Automatically clean up closed windows
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window) 
+                if control_window in self.control_windows else None
+            )
             
-            # Force window to front
-            self.control_menu_ref.show()
-            #self.control_menu_ref.raise_()
-            self.control_menu_ref.activateWindow()
-
-            print("Show called")  # Debug
+            self.control_windows.append(control_window)
+            control_window.show()
+            control_window.activateWindow()
 
         self.load_button.on_clicked(on_load)
         

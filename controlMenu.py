@@ -31,15 +31,18 @@ class ControlMenu(QDialog):
         self.controller = controller
         self.current_figure = None
         
-
         # CRITICAL SETTINGS (add these):
-        self.setWindowTitle(f"Controller - {name}")
+        self.setWindowTitle(name)  # Use the provided title
+
         self.setMinimumSize(800, 600)  # Force reasonable size
         self.setModal(False)
         self.setAttribute(Qt.WA_DeleteOnClose)
         
         # This is the magic flag combination that always works:
         #self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+
+
+        self.selected_span = None  # Track span selection times
 
         np.seterr(divide='ignore')
         self.span = None
@@ -115,6 +118,48 @@ class ControlMenu(QDialog):
             self.controller.help.createHelpMenu(8)
         else:
             QMessageBox.warning(self, "Help", "Help system not available")
+
+
+    def format_timestamp(self, seconds):
+        """Convert seconds to mm:ss.ms format"""
+        minutes = int(seconds // 60)
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Shows mm:ss.xx
+
+
+
+    def createSpanSelector(self, ax):
+        if self.span is not None:
+            try:
+                self.span.disconnect_events()
+            except:
+                pass
+            self.span = None
+        
+        def on_select(xmin, xmax):
+            idx_min = np.argmax(self.time >= xmin)
+            idx_max = np.argmax(self.time >= xmax)
+            selected_audio = self.audio[idx_min:idx_max]
+            sd.play(selected_audio, self.fs)
+            
+            # Store the selected span
+            self.selected_span = (xmin, xmax)
+            
+            # Update existing plot window title if open
+            if hasattr(self, 'plot_dialog') and self.plot_dialog:
+                self.plot_dialog.setWindowTitle(
+                    f"{self.fileName} {self.format_timestamp(xmin)}-{self.format_timestamp(xmax)}"
+                )
+            
+        self.span = SpanSelector(
+            ax,
+            on_select,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+
 
 
     def create_spectrogram_group(self, layout):
@@ -990,27 +1035,35 @@ class ControlMenu(QDialog):
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def show_plot_window(self):
-        if not self.current_figure:
-            return
+            if not self.current_figure:
+                return
+                
+            # Create base title
+            title = self.fileName
             
-        plot_dialog = QDialog(self)  # Parent to main window
-        plot_dialog.setWindowTitle(f"Plot - {self.fileName}")
-        plot_dialog.setAttribute(Qt.WA_DeleteOnClose)  # Clean up when closed
-        plot_dialog.setWindowFlags(Qt.Window)  # Regular window behavior
-        
-        layout = QVBoxLayout()
-        
-        canvas = FigureCanvas(self.current_figure)
-        toolbar = NavigationToolbar(canvas, plot_dialog)
-        
-        layout.addWidget(toolbar)
-        layout.addWidget(canvas)
-        plot_dialog.setLayout(layout)
-        
-        if len(self.current_figure.axes) > 0:
-            self.createSpanSelector(self.current_figure.axes[0])
-        
-        plot_dialog.show()  # Non-blocking show instead of exec_()
+            # Add span if available
+            if self.selected_span:
+                start, end = self.selected_span
+                title += f" {self.format_timestamp(start)}-{self.format_timestamp(end)}"
+            
+            # Create or update dialog
+            if not hasattr(self, 'plot_dialog') or not self.plot_dialog:
+                self.plot_dialog = QDialog(self)
+                self.plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
+                
+                layout = QVBoxLayout()
+                canvas = FigureCanvas(self.current_figure)
+                toolbar = NavigationToolbar(canvas, self.plot_dialog)
+                
+                layout.addWidget(toolbar)
+                layout.addWidget(canvas)
+                self.plot_dialog.setLayout(layout)
+                
+                if len(self.current_figure.axes) > 0:
+                    self.createSpanSelector(self.current_figure.axes[0])
+            
+            self.plot_dialog.setWindowTitle(title)
+            self.plot_dialog.show()
 
     def get_window(self, size):
         window_type = self.window_type.currentText()
@@ -1047,28 +1100,6 @@ class ControlMenu(QDialog):
         
         return segment, time_range
 
-    def createSpanSelector(self, ax):
-        if self.span is not None:
-            try:
-                self.span.disconnect_events()
-            except:
-                pass
-            self.span = None
-        
-        def on_select(xmin, xmax):
-            idx_min = np.argmax(self.time >= xmin)
-            idx_max = np.argmax(self.time >= xmax)
-            selected_audio = self.audio[idx_min:idx_max]
-            sd.play(selected_audio, self.fs)
-            
-        self.span = SpanSelector(
-            ax,
-            on_select,
-            'horizontal',
-            useblit=True,
-            interactive=True,
-            drag_from_anywhere=True
-        )
 
 
 
@@ -1077,3 +1108,7 @@ class ControlMenu(QDialog):
             plt.close(self.current_figure)
         plt.close('all')
         event.accept()
+
+
+
+        
