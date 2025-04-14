@@ -177,7 +177,7 @@ class Load(QWidget):
             
             # Force window to front
             self.control_menu_ref.show()
-            self.control_menu_ref.raise_()
+            #self.control_menu_ref.raise_()
             self.control_menu_ref.activateWindow()
 
             print("Show called")  # Debug

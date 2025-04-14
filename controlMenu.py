@@ -39,12 +39,12 @@ class ControlMenu(QDialog):
         self.setAttribute(Qt.WA_DeleteOnClose)
         
         # This is the magic flag combination that always works:
-        self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
+        #self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
         np.seterr(divide='ignore')
         self.span = None
         self.setupUI()
-        
+
         print("PAST CONSTRUCTOR")
 
     def setupUI(self):
@@ -993,8 +993,11 @@ class ControlMenu(QDialog):
         if not self.current_figure:
             return
             
-        plot_dialog = QDialog()
-        plot_dialog.setWindowTitle(self.fileName)
+        plot_dialog = QDialog(self)  # Parent to main window
+        plot_dialog.setWindowTitle(f"Plot - {self.fileName}")
+        plot_dialog.setAttribute(Qt.WA_DeleteOnClose)  # Clean up when closed
+        plot_dialog.setWindowFlags(Qt.Window)  # Regular window behavior
+        
         layout = QVBoxLayout()
         
         canvas = FigureCanvas(self.current_figure)
@@ -1007,7 +1010,7 @@ class ControlMenu(QDialog):
         if len(self.current_figure.axes) > 0:
             self.createSpanSelector(self.current_figure.axes[0])
         
-        plot_dialog.exec_()
+        plot_dialog.show()  # Non-blocking show instead of exec_()
 
     def get_window(self, size):
         window_type = self.window_type.currentText()
