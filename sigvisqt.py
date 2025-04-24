@@ -36,6 +36,8 @@ class Start(QMainWindow):
         self.setWindowTitle("Signal Visualizer")
         self.setWindowIcon(QIcon('icons/icon.ico'))
 
+        
+
         self.icons = {
             'icon': QIcon('icons/icon.ico')  # Make sure this path is correct
         }

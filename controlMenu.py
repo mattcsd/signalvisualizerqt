@@ -41,7 +41,7 @@ class ControlMenu(QDialog):
         # This is the magic flag combination that always works:
         #self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
-
+        self.plot_windows = []  # Track all plot windows
         self.selected_span = None  # Track span selection times
 
         np.seterr(divide='ignore')
@@ -1035,35 +1035,26 @@ class ControlMenu(QDialog):
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def show_plot_window(self):
-            if not self.current_figure:
-                return
-                
-            # Create base title
-            title = self.fileName
-            
-            # Add span if available
-            if self.selected_span:
-                start, end = self.selected_span
-                title += f" {self.format_timestamp(start)}-{self.format_timestamp(end)}"
-            
-            # Create or update dialog
-            if not hasattr(self, 'plot_dialog') or not self.plot_dialog:
-                self.plot_dialog = QDialog(self)
-                self.plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
-                
-                layout = QVBoxLayout()
-                canvas = FigureCanvas(self.current_figure)
-                toolbar = NavigationToolbar(canvas, self.plot_dialog)
-                
-                layout.addWidget(toolbar)
-                layout.addWidget(canvas)
-                self.plot_dialog.setLayout(layout)
-                
-                if len(self.current_figure.axes) > 0:
-                    self.createSpanSelector(self.current_figure.axes[0])
-            
-            self.plot_dialog.setWindowTitle(title)
-            self.plot_dialog.show()
+        # Create new plot dialog
+        plot_dialog = QDialog(self)
+        plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
+        
+        # Setup plot content
+        layout = QVBoxLayout()
+        canvas = FigureCanvas(self.current_figure)
+        toolbar = NavigationToolbar(canvas, plot_dialog)
+        layout.addWidget(toolbar)
+        layout.addWidget(canvas)
+        plot_dialog.setLayout(layout)
+        
+        # Automatically remove from tracking when closed
+        plot_dialog.destroyed.connect(
+            lambda: self.plot_windows.remove(plot_dialog) 
+            if plot_dialog in self.plot_windows else None
+        )
+        
+        self.plot_windows.append(plot_dialog)
+        plot_dialog.show()
 
     def get_window(self, size):
         window_type = self.window_type.currentText()
@@ -1104,11 +1095,21 @@ class ControlMenu(QDialog):
 
 
     def closeEvent(self, event):
-        if self.current_figure:
+        # Close all plot windows
+        for window in self.plot_windows[:]:  # Iterate over copy
+            try:
+                window.close()
+            except RuntimeError:
+                pass  # Already closed
+        
+        # Clear the list
+        self.plot_windows.clear()
+        
+        # Close figures
+        if hasattr(self, 'current_figure') and self.current_figure:
             plt.close(self.current_figure)
-        plt.close('all')
+        
         event.accept()
 
 
 
-        
