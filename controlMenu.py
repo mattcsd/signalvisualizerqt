@@ -23,17 +23,19 @@ from pathlib import Path
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
         super().__init__(None)
-        self.fileName = name
+        self.base_name = name.split('_[')[0] if '_[' in name else name.split(' [')[0] if ' [' in name else name        
         self.audio = audio
+        self.current_audio = audio  # Will hold either full audio or selection
         self.fs = fs
         self.duration = duration
         self.lenAudio = len(audio)
         self.time = np.arange(0, self.lenAudio/self.fs, 1/self.fs)
         self.controller = controller
         self.current_figure = None
+        self.selected_span = None  # Initialize as None
         
         # CRITICAL SETTINGS (add these):
-        self.setWindowTitle(name)  # Use the provided title
+        self.setWindowTitle(self.base_name)  # Use the provided title
 
         self.setMinimumSize(800, 600)  # Force reasonable size
         self.setModal(False)
@@ -52,7 +54,7 @@ class ControlMenu(QDialog):
         print("PAST CONSTRUCTOR")
 
     def setupUI(self):
-        self.setWindowTitle(self.fileName)
+        self.setWindowTitle(self.base_name)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         
         main_layout = QGridLayout()
@@ -91,7 +93,6 @@ class ControlMenu(QDialog):
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
 
-
     def show_help(self):
         """Properly shows and activates the help window"""
         if hasattr(self.controller, 'help'):
@@ -120,7 +121,6 @@ class ControlMenu(QDialog):
         else:
             QMessageBox.warning(self, "Help", "Help system not available")
 
-
     def format_timestamp(self, seconds):
         """Convert seconds to mm:ss.ms format with exactly 2 decimal places"""
         minutes = int(seconds // 60)
@@ -128,22 +128,20 @@ class ControlMenu(QDialog):
         return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Format as 00:00.00
 
     def update_plot_window_titles(self):
-        """Update titles for all open plot windows with current span"""
+        """Update all open plot windows with current selection"""
         if not hasattr(self, 'selected_span') or not self.selected_span:
             return
         
         method = self.method_selector.currentText()
-        base_name = self.fileName.split(' [')[0] if ' [' in self.fileName else self.fileName
         start, end = self.selected_span
-        
-        new_title = f"{method}_{base_name}_[{self.format_timestamp(start)}-{self.format_timestamp(end)}]"
+        new_title = f"{method}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
         
         for window in self.plot_windows:
             try:
                 if window.isVisible():
                     window.setWindowTitle(new_title)
             except RuntimeError:
-                continue  # Skip already deleted windows
+                continue  # Skip deleted windows
 
     def createSpanSelector(self, ax):
         if self.span is not None:
@@ -154,17 +152,19 @@ class ControlMenu(QDialog):
             self.span = None
         
         def on_select(xmin, xmax):
-            # Handle audio selection and playback
             idx_min = np.argmax(self.time >= xmin)
             idx_max = np.argmax(self.time >= xmax)
-            selected_audio = self.audio[idx_min:idx_max]
-            sd.play(selected_audio, self.fs)
             
-            # Store the selected span
-            self.selected_span = (xmin, xmax)
-            
-            # Update all plot window titles
-            #self.update_plot_window_titles()
+            if idx_max > idx_min:
+                self.selected_span = (xmin, xmax)
+                # Update CONTROLLER window title
+                self.setWindowTitle(
+                    f"{self.base_name}_{self.format_timestamp(xmin)}-{self.format_timestamp(xmax)}"
+                )
+                # Update all open PLOT windows
+                self.update_plot_window_titles()
+                # Play the selected audio
+                sd.play(self.audio[idx_min:idx_max], self.fs)
         
         self.span = SpanSelector(
             ax,
@@ -305,6 +305,17 @@ class ControlMenu(QDialog):
         grid.addWidget(self.fcut1, 5, 1)
         grid.addWidget(QLabel("Fcut2:"), 6, 0)
         grid.addWidget(self.fcut2, 6, 1)
+
+        # Add visualization type radio buttons
+        self.vis_type_label = QLabel("Visualization:")
+        self.waveform_radio = QRadioButton("Waveform")
+        self.spectrogram_radio = QRadioButton("Spectrogram")
+        self.waveform_radio.setChecked(True)  # Default to waveform
+        
+        # Add to layout (adjust row numbers as needed)
+        grid.addWidget(self.vis_type_label, 7, 0)
+        grid.addWidget(self.waveform_radio, 7, 1)
+        grid.addWidget(self.spectrogram_radio, 8, 1)
         
         group.setLayout(grid)
         layout.addWidget(group, 1, 2, 7, 2)
@@ -385,7 +396,6 @@ class ControlMenu(QDialog):
         
         self.filter_response_button.setEnabled(filtering_enabled)
 
-
     def plot_filter_response(self):
             filter_type = self.filter_type.currentText()
             percentage = float(self.percentage.text())
@@ -464,7 +474,6 @@ class ControlMenu(QDialog):
     # [Rest of your methods remain unchanged...]
         # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
         # All other existing methods should be kept exactly as they were in the previous implementation
-
 
     def plot_figure(self):
         method = self.method_selector.currentText()
@@ -651,7 +660,6 @@ class ControlMenu(QDialog):
             dummy_length = len(self.audio) // 512  # Approximate number of frames
             return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
     
-
     def plot_spectrogram(self):
         try:
             wind_size = float(self.window_size.text())
@@ -662,9 +670,9 @@ class ControlMenu(QDialog):
             draw_style = self.draw_style.currentIndex() + 1
             show_pitch = self.show_pitch.isChecked()
             
-            # Ensure audio and time arrays match exactly
-            min_length = min(len(self.audio), len(self.time))
-            audio = self.audio[:min_length]
+            # Use current_audio instead of self.audio
+            min_length = min(len(self.current_audio), len(self.time))
+            audio = self.current_audio[:min_length]
             time = self.time[:min_length]
             
             # Create figure with adjusted layout
@@ -752,7 +760,6 @@ class ControlMenu(QDialog):
                                bbox=dict(boxstyle='round,pad=0.2', 
                                        fc='black', alpha=0.7))
 
-
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection"""
         try:
@@ -835,12 +842,6 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
-
-
-
-
-
-
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
         if event.inaxes != ax1 or event.button != 1 or event.dblclick:
@@ -898,13 +899,6 @@ class ControlMenu(QDialog):
         self.img.autoscale()
         
         self.current_figure.canvas.draw()
-
-
-
-
-
-
-
 
     def plot_ste(self):
         wind_size = float(self.window_size.text())
@@ -1043,6 +1037,62 @@ class ControlMenu(QDialog):
         
         self.show_plot_window()
 
+    def plot_filtered_waveform(self, filter_type, filtered_signal):
+        """Plot original and filtered waveforms"""
+        self.current_figure, ax = plt.subplots(2, figsize=(12,6))
+        self.current_figure.suptitle(f'Filtered Signal ({filter_type}) - Waveform')
+        
+        ax[0].plot(self.time, self.audio)
+        ax[0].set(xlim=[0, self.duration], title='Original Signal')
+        
+        ax[1].plot(self.time, filtered_signal)
+        ax[1].set(xlim=[0, self.duration], title='Filtered Signal')
+        
+        self.show_plot_window()
+
+    def plot_filtered_spectrogram(self, filter_type, filtered_signal):
+        """Plot original and filtered spectrograms"""
+        try:
+            # Create figure
+            self.current_figure = plt.figure(figsize=(12, 8))
+            gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
+            
+            # Get parameters from spectrogram controls
+            nfft = int(self.nfft.currentText())
+            wind_size = float(self.window_size.text())
+            overlap = float(self.overlap.text())
+            hop_length = int(wind_size * self.fs * (1 - overlap))
+            window = self.get_window(int(wind_size * self.fs))
+            
+            # Original spectrogram
+            ax0 = plt.subplot(gs[0])
+            D_orig = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_length, 
+                                win_length=int(wind_size*self.fs), window=window)
+            S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
+            img_orig = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='log',
+                                              sr=self.fs, hop_length=hop_length, ax=ax0)
+            ax0.set(title='Original Signal Spectrogram')
+            plt.colorbar(img_orig, ax=ax0, format="%+2.0f dB")
+            
+            # Filtered spectrogram
+            ax1 = plt.subplot(gs[1])
+            D_filt = librosa.stft(filtered_signal, n_fft=nfft, hop_length=hop_length,
+                                win_length=int(wind_size*self.fs), window=window)
+            S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
+            img_filt = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='log',
+                                              sr=self.fs, hop_length=hop_length, ax=ax1)
+            ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
+            plt.colorbar(img_filt, ax=ax1, format="%+2.0f dB")
+            
+            self.current_figure.tight_layout()
+            self.show_plot_window()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", 
+                               f"Spectrogram failed: {str(e)}")
+            if self.current_figure:
+                plt.close(self.current_figure)
+
     def plot_filtering(self):
         filter_type = self.filter_type.currentText()
         percentage = float(self.percentage.text())
@@ -1103,13 +1153,10 @@ class ControlMenu(QDialog):
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle(f'Filtered Signal ({filter_type})')
         
-        ax[0].plot(self.time, self.audio)
-        ax[0].set(xlim=[0, self.duration], title='Original Signal')
-        
-        ax[1].plot(self.time, filtered_signal)
-        ax[1].set(xlim=[0, self.duration], title='Filtered Signal')
-        
-        self.show_plot_window()
+        if self.waveform_radio.isChecked():
+            self.plot_filtered_waveform(filter_type, filtered_signal)
+        else:
+            self.plot_filtered_spectrogram(filter_type, filtered_signal)
 
     def calculate_sc(self, segment):
         magnitudes = np.abs(np.fft.rfft(segment))
@@ -1119,24 +1166,21 @@ class ControlMenu(QDialog):
     def show_plot_window(self):
         # Get current analysis method
         method = self.method_selector.currentText()
-        
-        # Get base filename (remove any existing timestamps)
-        base_name = self.fileName.split(' [')[0] if ' [' in self.fileName else self.fileName
-        
-        # Get time span (use current selection or full duration)
+
+        # Determine time range
         if hasattr(self, 'selected_span') and self.selected_span:
             start, end = self.selected_span
         else:
             start, end = 0, self.duration
+
+        # Create consistent title
+        plot_title = f"{method}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
         
-        # Format the title
-        title = f"{method}_[{base_name}]"
-        
-        # Create new plot dialog
+        # Create plot dialog
         plot_dialog = QDialog(self)
-        plot_dialog.setWindowTitle(title)
+        plot_dialog.setWindowTitle(plot_title)
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
-        
+
         # Setup plot content
         layout = QVBoxLayout()
         canvas = FigureCanvas(self.current_figure)
@@ -1191,8 +1235,6 @@ class ControlMenu(QDialog):
             segment = np.pad(segment, (0, pad_size), 'constant')
         
         return segment, time_range
-
-
 
 
     def closeEvent(self, event):

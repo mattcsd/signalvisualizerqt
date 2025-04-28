@@ -108,6 +108,10 @@ class Load(QWidget):
             
     def plotAudio(self, audio):
         self.ax.clear()
+
+        # Reset selected span when loading new audio
+        self.selected_span = None
+        self.selectedAudio = np.empty(1)
         
         # Calculate time array
         duration = librosa.get_duration(filename=self.file_path)
