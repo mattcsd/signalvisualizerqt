@@ -17,6 +17,7 @@ from pitchAdvancedSettings import AdvancedSettings
 from PyQt5.QtWidgets import QVBoxLayout
 from scipy.io.wavfile import write
 from help import Help
+from pathlib import Path
 
 
 class ControlMenu(QDialog):
@@ -121,12 +122,28 @@ class ControlMenu(QDialog):
 
 
     def format_timestamp(self, seconds):
-        """Convert seconds to mm:ss.ms format"""
+        """Convert seconds to mm:ss.ms format with exactly 2 decimal places"""
         minutes = int(seconds // 60)
         seconds = seconds % 60
-        return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Shows mm:ss.xx
+        return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Format as 00:00.00
 
-
+    def update_plot_window_titles(self):
+        """Update titles for all open plot windows with current span"""
+        if not hasattr(self, 'selected_span') or not self.selected_span:
+            return
+        
+        method = self.method_selector.currentText()
+        base_name = self.fileName.split(' [')[0] if ' [' in self.fileName else self.fileName
+        start, end = self.selected_span
+        
+        new_title = f"{method}_{base_name}_[{self.format_timestamp(start)}-{self.format_timestamp(end)}]"
+        
+        for window in self.plot_windows:
+            try:
+                if window.isVisible():
+                    window.setWindowTitle(new_title)
+            except RuntimeError:
+                continue  # Skip already deleted windows
 
     def createSpanSelector(self, ax):
         if self.span is not None:
@@ -137,6 +154,7 @@ class ControlMenu(QDialog):
             self.span = None
         
         def on_select(xmin, xmax):
+            # Handle audio selection and playback
             idx_min = np.argmax(self.time >= xmin)
             idx_max = np.argmax(self.time >= xmax)
             selected_audio = self.audio[idx_min:idx_max]
@@ -145,12 +163,9 @@ class ControlMenu(QDialog):
             # Store the selected span
             self.selected_span = (xmin, xmax)
             
-            # Update existing plot window title if open
-            if hasattr(self, 'plot_dialog') and self.plot_dialog:
-                self.plot_dialog.setWindowTitle(
-                    f"{self.fileName} {self.format_timestamp(xmin)}-{self.format_timestamp(xmax)}"
-                )
-            
+            # Update all plot window titles
+            #self.update_plot_window_titles()
+        
         self.span = SpanSelector(
             ax,
             on_select,
@@ -159,8 +174,6 @@ class ControlMenu(QDialog):
             interactive=True,
             drag_from_anywhere=True
         )
-
-
 
     def create_spectrogram_group(self, layout):
         group = QGroupBox("Spectrogram")
@@ -600,6 +613,45 @@ class ControlMenu(QDialog):
         
         self.current_figure.canvas.draw()
 
+    def calculate_pitch(self):
+        """Calculate pitch using YIN algorithm with current librosa version"""
+        try:
+            # Get parameters from UI
+            min_pitch = float(self.min_pitch.text())
+            max_pitch = float(self.max_pitch.text())
+            
+            # Convert audio to mono if needed and normalize
+            audio = np.mean(self.audio, axis=1) if len(self.audio.shape) > 1 else self.audio
+            audio = librosa.util.normalize(audio)
+            
+            # Calculate pitch using YIN algorithm
+            f0, voiced_flag, voiced_probs = librosa.pyin(
+                audio,
+                fmin=min_pitch,
+                fmax=max_pitch,
+                sr=self.fs,
+                frame_length=2048,
+                hop_length=512,
+                fill_na=np.nan  # Fill unvoiced frames with NaN
+            )
+            
+            # Simple smoothing using median filter (replacement for librosa.util.smooth)
+            if len(f0) > 0:
+                from scipy.ndimage import median_filter
+                f0_smoothed = median_filter(f0, size=5)
+                f0_smoothed[~voiced_flag] = np.nan
+            else:
+                f0_smoothed = f0
+                
+            return f0, f0_smoothed
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Pitch Error", f"Could not calculate pitch: {str(e)}")
+            # Return arrays of NaN with appropriate length
+            dummy_length = len(self.audio) // 512  # Approximate number of frames
+            return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
+    
+
     def plot_spectrogram(self):
         try:
             wind_size = float(self.window_size.text())
@@ -636,11 +688,11 @@ class ControlMenu(QDialog):
             # Create spectrogram
             if draw_style == 1:
                 D = librosa.stft(audio, n_fft=nfft, hop_length=hop_size, 
-                                win_length=wind_size_samples, window=window)
+                win_length=wind_size_samples, window=window)
                 S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
-                                            sr=self.fs, hop_length=hop_size, 
-                                            fmin=min_freq, fmax=max_freq, ax=ax1)
+                                        sr=self.fs, hop_length=hop_size, 
+                                    fmin=min_freq, fmax=max_freq, ax=ax1)
             else:
                 S = librosa.feature.melspectrogram(y=audio, sr=self.fs, 
                                                 n_fft=nfft, hop_length=hop_size,
@@ -655,20 +707,50 @@ class ControlMenu(QDialog):
             # Add colorbar to dedicated axis
             self.current_figure.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
             
+            
+            self.annotate_brightest_frequencies(ax1, S_db, hop_size, nfft)
             # Add pitch contour if enabled
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
                 # Ensure pitch values match time points
                 pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
-                ax1.plot(pitch_times, pitch_values, '-', color='white')
-            
+                ax1.plot(pitch_times, pitch_values, '-', color='red', linewidth=2, alpha=0.8)            
             # Set matching x-axis limits
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
             
+            if not hasattr(self, 'selected_span') or not self.selected_span:
+                self.selected_span = (0, self.duration)
+                
             self.show_plot_window()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
+
+    def annotate_brightest_frequencies(self, ax, S_db, hop_length, nfft):
+        """Annotate the top 3 brightest frequencies at each time frame"""
+        # Find time points (every 0.5 seconds for cleaner display)
+        time_points = librosa.times_like(S_db, sr=self.fs, hop_length=hop_length)
+        step = max(1, int(0.5 * self.fs / hop_length))  # ~0.5 sec intervals
+        
+        for i in range(0, S_db.shape[1], step):
+            # Get the frame's magnitude data
+            frame = S_db[:, i]
+            
+            # Find top 3 brightest frequencies (least negative dB values)
+            brightest = np.argpartition(frame, -3)[-3:]
+            brightest = brightest[np.argsort(frame[brightest])][::-1]  # Sort descending
+            
+            for idx in brightest[:3]:  # Take top 3
+                if frame[idx] > -80:  # Only show if above noise floor
+                    freq = librosa.fft_frequencies(sr=self.fs, n_fft=nfft)[idx]
+                    ax.annotate(f'{freq:.0f} Hz',
+                               xy=(time_points[i], freq),
+                               xytext=(5, 5),
+                               textcoords='offset points',
+                               color='white',
+                               fontsize=8,
+                               bbox=dict(boxstyle='round,pad=0.2', 
+                                       fc='black', alpha=0.7))
 
 
     def plot_stft_spect(self):
@@ -1035,8 +1117,24 @@ class ControlMenu(QDialog):
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def show_plot_window(self):
+        # Get current analysis method
+        method = self.method_selector.currentText()
+        
+        # Get base filename (remove any existing timestamps)
+        base_name = self.fileName.split(' [')[0] if ' [' in self.fileName else self.fileName
+        
+        # Get time span (use current selection or full duration)
+        if hasattr(self, 'selected_span') and self.selected_span:
+            start, end = self.selected_span
+        else:
+            start, end = 0, self.duration
+        
+        # Format the title
+        title = f"{method}_[{base_name}]"
+        
         # Create new plot dialog
         plot_dialog = QDialog(self)
+        plot_dialog.setWindowTitle(title)
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
         
         # Setup plot content
@@ -1047,12 +1145,15 @@ class ControlMenu(QDialog):
         layout.addWidget(canvas)
         plot_dialog.setLayout(layout)
         
-        # Automatically remove from tracking when closed
+        # Add span selector if applicable
+        if len(self.current_figure.axes) > 0:
+            self.createSpanSelector(self.current_figure.axes[0])
+        
+        # Track window and handle cleanup
         plot_dialog.destroyed.connect(
             lambda: self.plot_windows.remove(plot_dialog) 
             if plot_dialog in self.plot_windows else None
         )
-        
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
 
