@@ -33,6 +33,9 @@ class ControlMenu(QDialog):
         self.controller = controller
         self.current_figure = None
         self.selected_span = None  # Initialize as None
+
+        self.plot_windows = []  # Track plot windows
+        self.span_selectors = {}  # Track span selectors by window ID
         
         # CRITICAL SETTINGS (add these):
         self.setWindowTitle(self.base_name)  # Use the provided title
@@ -162,7 +165,7 @@ class ControlMenu(QDialog):
                     f"{self.base_name}_{self.format_timestamp(xmin)}-{self.format_timestamp(xmax)}"
                 )
                 # Update all open PLOT windows
-                self.update_plot_window_titles()
+                #self.update_plot_window_titles()
                 # Play the selected audio
                 sd.play(self.audio[idx_min:idx_max], self.fs)
         
@@ -515,8 +518,7 @@ class ControlMenu(QDialog):
         ax[1].plot(freqs, 20*np.log10(abs(fft)))
         ax[1].set(xlim=[0, max(freqs)], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
         
-        self.show_plot_window()
-
+        self.show_plot_window(self.current_figure, ax[0], self.audio)
     def plot_stft(self):
         """STFT with proper array dimension handling"""
         try:
@@ -556,8 +558,7 @@ class ControlMenu(QDialog):
                 lambda e: self.on_window_click(e, ax)
             )
             
-            self.show_plot_window()
-            
+            self.show_plot_window(self.current_figure, ax[0], self.audio)            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT plot failed: {str(e)}")
 
@@ -670,67 +671,54 @@ class ControlMenu(QDialog):
             draw_style = self.draw_style.currentIndex() + 1
             show_pitch = self.show_pitch.isChecked()
             
-            # Use current_audio instead of self.audio
             min_length = min(len(self.current_audio), len(self.time))
             audio = self.current_audio[:min_length]
             time = self.time[:min_length]
             
-            # Create figure with adjusted layout
-            self.current_figure = plt.figure(figsize=(12, 6))
-            gs = plt.GridSpec(2, 2, width_ratios=[15, 1], height_ratios=[1, 3], 
-                             hspace=0.1, wspace=0.05)
-            ax0 = plt.subplot(gs[0, 0])  # Waveform
-            ax1 = plt.subplot(gs[1, 0], sharex=ax0)  # Spectrogram
-            cbar_ax = plt.subplot(gs[:, 1])  # Colorbar
-            
-            self.current_figure.suptitle('Spectrogram', y=0.98)
-            
+            fig = plt.figure(figsize=(12, 6))
+            gs = plt.GridSpec(2, 2, width_ratios=[15, 1], height_ratios=[1, 3], hspace=0.1, wspace=0.05)
+            ax0 = plt.subplot(gs[0, 0])
+            ax1 = plt.subplot(gs[1, 0], sharex=ax0)
+            cbar_ax = plt.subplot(gs[:, 1])
+            fig.suptitle('Spectrogram', y=0.98)
+
             wind_size_samples = int(wind_size * self.fs)
             hop_size = wind_size_samples - int(overlap * self.fs)
             window = self.get_window(wind_size_samples)
             
-            # Plot waveform
             ax0.plot(time, audio)
             ax0.set(ylabel='Amplitude')
             
-            # Create spectrogram
             if draw_style == 1:
-                D = librosa.stft(audio, n_fft=nfft, hop_length=hop_size, 
-                win_length=wind_size_samples, window=window)
+                D = librosa.stft(audio, n_fft=nfft, hop_length=hop_size,
+                                 win_length=wind_size_samples, window=window)
                 S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
-                                        sr=self.fs, hop_length=hop_size, 
-                                    fmin=min_freq, fmax=max_freq, ax=ax1)
+                                               sr=self.fs, hop_length=hop_size,
+                                               fmin=min_freq, fmax=max_freq, ax=ax1)
             else:
-                S = librosa.feature.melspectrogram(y=audio, sr=self.fs, 
-                                                n_fft=nfft, hop_length=hop_size,
-                                                win_length=wind_size_samples, 
-                                                window=window, fmin=min_freq, 
-                                                fmax=max_freq)
+                S = librosa.feature.melspectrogram(y=audio, sr=self.fs,
+                                                   n_fft=nfft, hop_length=hop_size,
+                                                   win_length=wind_size_samples,
+                                                   window=window, fmin=min_freq,
+                                                   fmax=max_freq)
                 S_db = librosa.power_to_db(S, ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='mel',
-                                            sr=self.fs, hop_length=hop_size,
-                                            fmin=min_freq, fmax=max_freq, ax=ax1)
+                                               sr=self.fs, hop_length=hop_size,
+                                               fmin=min_freq, fmax=max_freq, ax=ax1)
             
-            # Add colorbar to dedicated axis
-            self.current_figure.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
-            
-            
+            fig.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
             self.annotate_brightest_frequencies(ax1, S_db, hop_size, nfft)
-            # Add pitch contour if enabled
+
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
-                # Ensure pitch values match time points
                 pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
-                ax1.plot(pitch_times, pitch_values, '-', color='red', linewidth=2, alpha=0.8)            
-            # Set matching x-axis limits
+                ax1.plot(pitch_times, pitch_values, '-', color='red', linewidth=2, alpha=0.8)
+
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
-            
-            if not hasattr(self, 'selected_span') or not self.selected_span:
-                self.selected_span = (0, self.duration)
-                
-            self.show_plot_window()
+
+            self.show_plot_window(fig, ax0, audio)  # ← pass individual data
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
@@ -837,8 +825,7 @@ class ControlMenu(QDialog):
                 lambda e: self.on_window_click_spect(e, ax1, ax2, ax3)
             )
             
-            self.show_plot_window()
-            
+            self.show_plot_window(self.current_figure, ax1, self.audio)            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
@@ -945,8 +932,7 @@ class ControlMenu(QDialog):
         ax[1].plot(time_points, ste)
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
-        self.show_plot_window()
-
+        self.show_plot_window(self.current_figure, ax[0], self.audio)
     def plot_pitch(self):
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
@@ -975,8 +961,7 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], ylim=[min_pitch, max_pitch], 
                  xlabel='Time (s)', ylabel='Frequency (Hz)')
         
-        self.show_plot_window()
-
+        self.show_plot_window(self.current_figure, ax[0], self.audio)
     def plot_spectral_centroid(self):
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
@@ -1035,63 +1020,105 @@ class ControlMenu(QDialog):
         
         self.current_figure.colorbar(img, ax=ax3, format="%+2.0f dB")
         
-        self.show_plot_window()
-
+        self.show_plot_window(self.current_figure, ax1, self.audio)
     def plot_filtered_waveform(self, filter_type, filtered_signal):
-        """Plot original and filtered waveforms"""
+        """Plot original and filtered waveforms with proper span selectors"""
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle(f'Filtered Signal ({filter_type}) - Waveform')
         
+        # Plot original signal
         ax[0].plot(self.time, self.audio)
         ax[0].set(xlim=[0, self.duration], title='Original Signal')
         
+        # Plot filtered signal
         ax[1].plot(self.time, filtered_signal)
         ax[1].set(xlim=[0, self.duration], title='Filtered Signal')
         
-        self.show_plot_window()
+        # Get unique identifier for this plot window
+        plot_id = id(self.current_figure.canvas.manager.window)
+        
+        # Create span selectors for both signals
+        self.create_span_selector(ax[0], self.audio, plot_id)  # Note: ax[0] not ax0
+        self.create_span_selector(ax[1], filtered_signal, plot_id)  # Note: ax[1] not ax1
+        
+        self.show_plot_window(self.current_figure, ax[0], self.audio)
+
+    #similar to createSpanSelector just this takes the audio
+    def create_span_selector(self, ax, audio_signal, plot_id):
+        """Create a span selector for a specific plot window"""
+        def onselect(xmin, xmax):
+            start_sample = int(xmin * self.fs)
+            end_sample = int(xmax * self.fs)
+            segment = audio_signal[start_sample:end_sample]
+            
+            sd.stop()
+            sd.play(segment, self.fs)
+            
+            # Visual feedback just for this plot
+            for patch in ax.patches:
+                if hasattr(patch, 'get_label') and patch.get_label() == 'selection':
+                    patch.remove()
+            ax.axvspan(xmin, xmax, color='red', alpha=0.3, label='selection')
+            plt.gcf().canvas.draw()
+        
+        # Remove old selector if exists
+        if plot_id in self.span_selectors:
+            for selector in self.span_selectors[plot_id]:
+                try:
+                    selector.disconnect_events()
+                except:
+                    pass
+        
+        # Create new selector
+        selector = SpanSelector(
+            ax,
+            onselect,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+        
+        # Store selector
+        if plot_id not in self.span_selectors:
+            self.span_selectors[plot_id] = []
+        self.span_selectors[plot_id].append(selector)
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
-        """Plot original and filtered spectrograms"""
+        """Plot original and filtered spectrograms with proper span selectors"""
         try:
-            # Create figure
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
             
-            # Get parameters from spectrogram controls
-            nfft = int(self.nfft.currentText())
-            wind_size = float(self.window_size.text())
-            overlap = float(self.overlap.text())
-            hop_length = int(wind_size * self.fs * (1 - overlap))
-            window = self.get_window(int(wind_size * self.fs))
+            # Get unique identifier for this plot window
+            plot_id = id(self.current_figure.canvas.manager.window)
             
             # Original spectrogram
             ax0 = plt.subplot(gs[0])
-            D_orig = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_length, 
-                                win_length=int(wind_size*self.fs), window=window)
+            D_orig = librosa.stft(self.audio, n_fft=2048, hop_length=512)
             S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
-            img_orig = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='log',
-                                              sr=self.fs, hop_length=hop_length, ax=ax0)
+            librosa.display.specshow(S_db_orig, x_axis='time', y_axis='log',
+                                   sr=self.fs, ax=ax0)
             ax0.set(title='Original Signal Spectrogram')
-            plt.colorbar(img_orig, ax=ax0, format="%+2.0f dB")
+            self.create_span_selector(ax0, self.audio, plot_id)  # Pass plot_id
             
             # Filtered spectrogram
             ax1 = plt.subplot(gs[1])
-            D_filt = librosa.stft(filtered_signal, n_fft=nfft, hop_length=hop_length,
-                                win_length=int(wind_size*self.fs), window=window)
+            D_filt = librosa.stft(filtered_signal, n_fft=2048, hop_length=512)
             S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
-            img_filt = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='log',
-                                              sr=self.fs, hop_length=hop_length, ax=ax1)
+            librosa.display.specshow(S_db_filt, x_axis='time', y_axis='log',
+                                   sr=self.fs, ax=ax1)
             ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
-            plt.colorbar(img_filt, ax=ax1, format="%+2.0f dB")
+            self.create_span_selector(ax1, filtered_signal, plot_id)  # Pass plot_id
             
             self.current_figure.tight_layout()
-            self.show_plot_window()
+            self.show_plot_window(self.current_figure, ax1, self.audio)
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", 
-                               f"Spectrogram failed: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
             if self.current_figure:
                 plt.close(self.current_figure)
+
 
     def plot_filtering(self):
         filter_type = self.filter_type.currentText()
@@ -1163,43 +1190,44 @@ class ControlMenu(QDialog):
         freqs = np.fft.rfftfreq(len(segment), 1/self.fs)
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
-    def show_plot_window(self):
-        # Get current analysis method
-        method = self.method_selector.currentText()
-
-        # Determine time range
-        if hasattr(self, 'selected_span') and self.selected_span:
-            start, end = self.selected_span
-        else:
-            start, end = 0, self.duration
-
-        # Create consistent title
-        plot_title = f"{method}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
+    def cleanup_plot_window(self, plot_id):
+        """Clean up resources when plot window closes"""
+        if plot_id in self.span_selectors:
+            for selector in self.span_selectors[plot_id]:
+                try:
+                    selector.disconnect_events()
+                except:
+                    pass
+            del self.span_selectors[plot_id]
         
-        # Create plot dialog
+        self.plot_windows = [w for w in self.plot_windows 
+                            if hasattr(w, 'plot_id') and w.plot_id != plot_id]
+
+
+    def show_plot_window(self, figure, waveform_ax, audio_signal):
+        method = self.method_selector.currentText()
+        start, end = 0, self.duration
+        plot_title = f"{method}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
+
         plot_dialog = QDialog(self)
         plot_dialog.setWindowTitle(plot_title)
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
+        plot_dialog.plot_id = id(plot_dialog)
 
-        # Setup plot content
         layout = QVBoxLayout()
-        canvas = FigureCanvas(self.current_figure)
+        canvas = FigureCanvas(figure)
         toolbar = NavigationToolbar(canvas, plot_dialog)
         layout.addWidget(toolbar)
         layout.addWidget(canvas)
         plot_dialog.setLayout(layout)
-        
-        # Add span selector if applicable
-        if len(self.current_figure.axes) > 0:
-            self.createSpanSelector(self.current_figure.axes[0])
-        
-        # Track window and handle cleanup
-        plot_dialog.destroyed.connect(
-            lambda: self.plot_windows.remove(plot_dialog) 
-            if plot_dialog in self.plot_windows else None
-        )
+
+        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)  # ← pass correct refs
+
+        plot_dialog.destroyed.connect(lambda: self.cleanup_plot_window(plot_dialog.plot_id))
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
+
+
 
     def get_window(self, size):
         window_type = self.window_type.currentText()
