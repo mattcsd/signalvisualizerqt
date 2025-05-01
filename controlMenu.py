@@ -309,11 +309,17 @@ class ControlMenu(QDialog):
         grid.addWidget(QLabel("Fcut2:"), 6, 0)
         grid.addWidget(self.fcut2, 6, 1)
 
+
         # Add visualization type radio buttons
         self.vis_type_label = QLabel("Visualization:")
         self.waveform_radio = QRadioButton("Waveform")
         self.spectrogram_radio = QRadioButton("Spectrogram")
         self.waveform_radio.setChecked(True)  # Default to waveform
+
+        # In your initialization code where you create the radio buttons:
+        self.waveform_radio.toggled.connect(lambda: self.update_ui_state('Filtering'))
+        self.spectrogram_radio.toggled.connect(lambda: self.update_ui_state('Filtering'))
+
         
         # Add to layout (adjust row numbers as needed)
         grid.addWidget(self.vis_type_label, 7, 0)
@@ -358,20 +364,29 @@ class ControlMenu(QDialog):
         spectral_centroid_enabled = method == 'Spectral Centroid'
         filtering_enabled = method == 'Filtering'
         
+        # Determine if we're showing spectrograms in filtering mode
+        show_filtering_spectrograms = (filtering_enabled and 
+                                      hasattr(self, 'waveform_radio') and 
+                                      not self.waveform_radio.isChecked())
+        
         # Spectrogram controls
         self.window_type.setEnabled(stft_enabled or spectrogram_enabled or stft_spect_enabled or 
-                                  spectral_centroid_enabled or ste_enabled)
-        self.window_size.setEnabled(not ft_enabled and not pitch_enabled and not filtering_enabled)
+                                  spectral_centroid_enabled or ste_enabled or show_filtering_spectrograms)
+        self.window_size.setEnabled(not ft_enabled and not pitch_enabled and 
+                                  (not filtering_enabled or show_filtering_spectrograms))
         self.overlap.setEnabled(spectrogram_enabled or stft_spect_enabled or 
-                               spectral_centroid_enabled or ste_enabled)
+                               spectral_centroid_enabled or ste_enabled or show_filtering_spectrograms)
         self.nfft.setEnabled(stft_enabled or spectrogram_enabled or stft_spect_enabled or 
-                            spectral_centroid_enabled or ste_enabled)
-        self.min_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or spectral_centroid_enabled)
-        self.max_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or spectral_centroid_enabled)
+                            spectral_centroid_enabled or ste_enabled or show_filtering_spectrograms)
+        self.min_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or 
+                               spectral_centroid_enabled or show_filtering_spectrograms)
+        self.max_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or 
+                               spectral_centroid_enabled or show_filtering_spectrograms)
         self.draw_style.setEnabled(spectrogram_enabled or stft_spect_enabled or 
                                  spectral_centroid_enabled or filtering_enabled)
         self.show_pitch.setEnabled(spectrogram_enabled)
         
+        # Rest of the method remains the same...
         # STE controls
         if ste_enabled and self.window_type.currentText() == 'Kaiser':
             self.beta.setEnabled(True)
@@ -1087,6 +1102,20 @@ class ControlMenu(QDialog):
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms with proper span selectors"""
         try:
+            # Get parameters from UI
+            wind_size = float(self.window_size.text())
+            overlap = float(self.overlap.text())
+            nfft = int(self.nfft.currentText())
+            min_freq = int(self.min_freq.text())
+            max_freq = int(self.max_freq.text())
+            draw_style = self.draw_style.currentIndex() + 1
+            window_name = self.window_type.currentText()
+            
+            # Calculate window samples and hop length
+            wind_size_samples = int(wind_size * self.fs)
+            hop_size = wind_size_samples - int(overlap * self.fs)
+            window = self.get_window(wind_size_samples)
+            
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
             
@@ -1095,21 +1124,66 @@ class ControlMenu(QDialog):
             
             # Original spectrogram
             ax0 = plt.subplot(gs[0])
-            D_orig = librosa.stft(self.audio, n_fft=2048, hop_length=512)
-            S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
-            librosa.display.specshow(S_db_orig, x_axis='time', y_axis='log',
-                                   sr=self.fs, ax=ax0)
+            img0 = None
+            if draw_style == 1:
+                D_orig = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size,
+                                     win_length=wind_size_samples, window=window)
+                S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
+                img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='linear',
+                                              sr=self.fs, hop_length=hop_size,
+                                              fmin=min_freq, fmax=max_freq, ax=ax0)
+            else:
+                S_orig = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
+                                                      n_fft=nfft, hop_length=hop_size,
+                                                      win_length=wind_size_samples,
+                                                      window=window, fmin=min_freq,
+                                                      fmax=max_freq)
+                S_db_orig = librosa.power_to_db(S_orig, ref=np.max)
+                img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='mel',
+                                              sr=self.fs, hop_length=hop_size,
+                                              fmin=min_freq, fmax=max_freq, ax=ax0)
+            
             ax0.set(title='Original Signal Spectrogram')
-            self.create_span_selector(ax0, self.audio, plot_id)  # Pass plot_id
+            self.create_span_selector(ax0, self.audio, plot_id)
             
             # Filtered spectrogram
             ax1 = plt.subplot(gs[1])
-            D_filt = librosa.stft(filtered_signal, n_fft=2048, hop_length=512)
-            S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
-            librosa.display.specshow(S_db_filt, x_axis='time', y_axis='log',
-                                   sr=self.fs, ax=ax1)
+            img1 = None
+            if draw_style == 1:
+                D_filt = librosa.stft(filtered_signal, n_fft=nfft, hop_length=hop_size,
+                                    win_length=wind_size_samples, window=window)
+                S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
+                img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='linear',
+                                              sr=self.fs, hop_length=hop_size,
+                                              fmin=min_freq, fmax=max_freq, ax=ax1)
+            else:
+                S_filt = librosa.feature.melspectrogram(y=filtered_signal, sr=self.fs,
+                                                       n_fft=nfft, hop_length=hop_size,
+                                                       win_length=wind_size_samples,
+                                                       window=window, fmin=min_freq,
+                                                       fmax=max_freq)
+                S_db_filt = librosa.power_to_db(S_filt, ref=np.max)
+                img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='mel',
+                                              sr=self.fs, hop_length=hop_size,
+                                              fmin=min_freq, fmax=max_freq, ax=ax1)
+            
             ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
-            self.create_span_selector(ax1, filtered_signal, plot_id)  # Pass plot_id
+            self.create_span_selector(ax1, filtered_signal, plot_id)
+            
+            # Add colorbars only if images were created successfully
+            if img0 is not None and img1 is not None:
+                # Adjust layout to make room for colorbars
+                self.current_figure.subplots_adjust(right=0.85)
+                
+                # Add colorbar for original spectrogram
+                cbar_ax0 = self.current_figure.add_axes([0.88, 0.55, 0.02, 0.35])
+                self.current_figure.colorbar(img0, cax=cbar_ax0, format="%+2.0f dB")
+                cbar_ax0.set_ylabel('Original Signal')
+                
+                # Add colorbar for filtered spectrogram
+                cbar_ax1 = self.current_figure.add_axes([0.88, 0.15, 0.02, 0.35])
+                self.current_figure.colorbar(img1, cax=cbar_ax1, format="%+2.0f dB")
+                cbar_ax1.set_ylabel('Filtered Signal')
             
             self.current_figure.tight_layout()
             self.show_plot_window(self.current_figure, ax1, self.audio)
@@ -1118,6 +1192,8 @@ class ControlMenu(QDialog):
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
             if self.current_figure:
                 plt.close(self.current_figure)
+
+                
 
 
     def plot_filtering(self):
