@@ -408,6 +408,10 @@ class ControlMenu(QDialog):
         self.fcut.setEnabled(False)
         self.fcut1.setEnabled(False)
         self.fcut2.setEnabled(False)
+
+        if hasattr(self, 'waveform_radio'):  # Check if radio buttons exist
+            self.waveform_radio.setEnabled(filtering_enabled)
+            self.spectrogram_radio.setEnabled(filtering_enabled)
         
         if filtering_enabled:
             self.update_filter_ui(self.filter_type.currentText())
@@ -676,13 +680,59 @@ class ControlMenu(QDialog):
             dummy_length = len(self.audio) // 512  # Approximate number of frames
             return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
     
+    def validate_spectrogram_parameters(self):
+        """Validate spectrogram parameters and return calculated values"""
+        # Get parameters from UI
+        wind_size = float(self.window_size.text())
+        overlap = float(self.overlap.text())
+        nfft = int(self.nfft.currentText())
+        min_freq = int(self.min_freq.text())
+        max_freq = int(self.max_freq.text())
+        
+        # Validate frequency range
+        if min_freq >= max_freq:
+            raise ValueError("Minimum frequency must be less than maximum frequency")
+        if min_freq < 0:
+            raise ValueError("Frequency values cannot be negative")
+        if max_freq > self.fs//2:
+            raise ValueError(f"Maximum frequency cannot exceed Nyquist frequency ({self.fs//2} Hz)")
+            
+        # Validate window and overlap sizes
+        if wind_size <= 0:
+            raise ValueError("Window size must be positive")
+        if overlap < 0:
+            raise ValueError("Overlap cannot be negative")
+        if overlap >= wind_size:
+            raise ValueError("Overlap must be smaller than window size")
+            
+        # Calculate window samples and hop length with safety checks
+        wind_size_samples = max(1, int(wind_size * self.fs))
+        hop_size = max(1, wind_size_samples - int(overlap * self.fs))
+        
+        # Validate NFFT
+        if nfft < wind_size_samples:
+            QMessageBox.warning(self, "Warning", 
+                              "NFFT should be at least as large as window size for best results")
+        
+        return {
+            'wind_size_samples': wind_size_samples,
+            'hop_size': hop_size,
+            'nfft': nfft,
+            'min_freq': min_freq,
+            'max_freq': max_freq
+        }
+
     def plot_spectrogram(self):
         try:
-            wind_size = float(self.window_size.text())
-            overlap = float(self.overlap.text())
-            nfft = int(self.nfft.currentText())
-            min_freq = int(self.min_freq.text())
-            max_freq = int(self.max_freq.text())
+            # Validate parameters and get calculated values
+            params = self.validate_spectrogram_parameters()
+            wind_size_samples = params['wind_size_samples']
+            hop_size = params['hop_size']
+            nfft = params['nfft']
+            min_freq = params['min_freq']
+            max_freq = params['max_freq']
+            
+            # Get remaining parameters
             draw_style = self.draw_style.currentIndex() + 1
             show_pitch = self.show_pitch.isChecked()
             
@@ -697,8 +747,6 @@ class ControlMenu(QDialog):
             cbar_ax = plt.subplot(gs[:, 1])
             fig.suptitle('Spectrogram', y=0.98)
 
-            wind_size_samples = int(wind_size * self.fs)
-            hop_size = wind_size_samples - int(overlap * self.fs)
             window = self.get_window(wind_size_samples)
             
             ax0.plot(time, audio)
@@ -733,9 +781,10 @@ class ControlMenu(QDialog):
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
 
-            self.show_plot_window(fig, ax0, audio)  # ← pass individual data
+            self.show_plot_window(fig, ax0, audio)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
+
 
     def annotate_brightest_frequencies(self, ax, S_db, hop_length, nfft):
         """Annotate the top 3 brightest frequencies at each time frame"""
@@ -1102,23 +1151,23 @@ class ControlMenu(QDialog):
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms with proper span selectors"""
         try:
-            # Get parameters from UI
-            wind_size = float(self.window_size.text())
-            overlap = float(self.overlap.text())
-            nfft = int(self.nfft.currentText())
-            min_freq = int(self.min_freq.text())
-            max_freq = int(self.max_freq.text())
+            # Validate parameters and get calculated values
+            params = self.validate_spectrogram_parameters()
+            wind_size_samples = params['wind_size_samples']
+            hop_size = params['hop_size']
+            nfft = params['nfft']
+            min_freq = params['min_freq']
+            max_freq = params['max_freq']
+            
+            # Get remaining parameters
             draw_style = self.draw_style.currentIndex() + 1
             window_name = self.window_type.currentText()
             
-            # Calculate window samples and hop length
-            wind_size_samples = int(wind_size * self.fs)
-            hop_size = wind_size_samples - int(overlap * self.fs)
-            window = self.get_window(wind_size_samples)
-            
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
+            plot_id = id(self.current_figure.canvas.manager.window)
             
+            window = self.get_window(wind_size_samples)
             # Get unique identifier for this plot window
             plot_id = id(self.current_figure.canvas.manager.window)
             
@@ -1193,7 +1242,7 @@ class ControlMenu(QDialog):
             if self.current_figure:
                 plt.close(self.current_figure)
 
-                
+
 
 
     def plot_filtering(self):
