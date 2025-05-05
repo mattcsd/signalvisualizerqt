@@ -20,6 +20,8 @@ from help import Help
 from pathlib import Path
 
 
+
+
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
         super().__init__(None)
@@ -213,6 +215,21 @@ class ControlMenu(QDialog):
         
         self.show_pitch = QCheckBox("Show Pitch")
         self.show_pitch.stateChanged.connect(self.toggle_pitch_controls)
+
+        self.live_analysis_btn = QPushButton("▶ Start Live Analysis")  # ▶ is a play symbol
+        self.live_analysis_btn.setCheckable(True)  # Makes it a toggle button
+        self.live_analysis_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                padding: 5px;
+            }
+            QPushButton:checked {
+                background-color: #ffcccc;
+            }
+        """)
+
+        self.live_analysis_btn.clicked.connect(self.toggle_live_analysis)
         
         grid.addWidget(QLabel("Window:"), 0, 0)
         grid.addWidget(self.window_type, 0, 1)
@@ -229,9 +246,54 @@ class ControlMenu(QDialog):
         grid.addWidget(QLabel("Drawing style:"), 6, 0)
         grid.addWidget(self.draw_style, 6, 1)
         grid.addWidget(self.show_pitch, 7, 0, 1, 2)
+
+        grid.addWidget(self.live_analysis_btn, 8, 0, 1, 2)  # Span across both columns
         
         group.setLayout(grid)
         layout.addWidget(group, 1, 0, 8, 2)
+
+    def toggle_live_analysis(self):
+        """Toggle the live analysis mode on/off"""
+        if self.live_analysis_btn.isChecked():
+            # Button was toggled ON
+            self.live_analysis_btn.setText("⏹ Stop Live Analysis")  # ⏹ is stop symbol
+            self.start_live_analysis()
+        else:
+            # Button was toggled OFF
+            self.live_analysis_btn.setText("▶ Start Live Analysis")
+            self.stop_live_analysis()
+
+    def start_live_analysis(self):
+        """Start the live analysis scrolling"""
+        if not hasattr(self, 'live_timer'):
+            self.live_timer = QTimer()
+            self.live_timer.timeout.connect(self.update_live_position)
+        self.live_timer.start(100)  # Update every 100ms
+
+    def stop_live_analysis(self):
+        """Stop the live analysis scrolling"""
+        if hasattr(self, 'live_timer'):
+            self.live_timer.stop()
+
+    def update_live_position(self):
+        """Move the analysis window forward"""
+        if not hasattr(self, 'wind_size_samples'):
+            return
+        
+        # Move window by 10% of its size each step
+        step = int(self.wind_size_samples * 0.1)
+        self.mid_point_idx = min(self.mid_point_idx + step, 
+                               len(self.audio) - self.wind_size_samples//2)
+        
+        # Update the display
+        if hasattr(self, 'current_figure'):
+            ax1, ax2, ax3 = self.current_figure.axes[:3]
+            self.update_stft_spect_plot(ax1, ax2, ax3)
+        
+        # Auto-stop at end of audio
+        if self.mid_point_idx >= len(self.audio) - self.wind_size_samples//2:
+            self.live_analysis_btn.setChecked(False)
+            self.toggle_live_analysis()
 
     def create_pitch_group(self, layout):
         group = QGroupBox("Pitch")
@@ -417,6 +479,46 @@ class ControlMenu(QDialog):
             self.update_filter_ui(self.filter_type.currentText())
         
         self.filter_response_button.setEnabled(filtering_enabled)
+
+    def toggle_live_analysis(self):
+        """Toggle continuous scrolling analysis mode"""
+        if not hasattr(self, 'live_analysis_timer'):
+            # Create timer if it doesn't exist
+            self.live_analysis_timer = QTimer()
+            self.live_analysis_timer.timeout.connect(self.update_live_analysis)
+        
+        if hasattr(self, 'is_live_analysis_running') and self.is_live_analysis_running:
+            # Stop live analysis
+            self.live_analysis_timer.stop()
+            self.is_live_analysis_running = False
+        else:
+            # Start live analysis
+            self.is_live_analysis_running = True
+            self.live_analysis_speed = 100  # ms between updates (adjust as needed)
+            self.live_analysis_timer.start(self.live_analysis_speed)
+
+
+    def update_live_analysis(self):
+        """Move analysis window forward in time"""
+        if not hasattr(self, 'wind_size_samples'):
+            return
+        
+        # Calculate next position
+        step_size = int(self.wind_size_samples * 0.1)  # Move 10% of window size each step
+        self.mid_point_idx += step_size
+        
+        # Check if we've reached the end
+        if self.mid_point_idx + self.wind_size_samples//2 >= len(self.audio):
+            self.mid_point_idx = self.wind_size_samples//2  # Wrap around to start
+            if hasattr(self, 'live_analysis_timer'):
+                self.live_analysis_timer.stop()
+                self.is_live_analysis_running = False
+            return
+        
+        # Update the plot
+        if hasattr(self, 'current_figure') and self.current_figure:
+            ax1, ax2, ax3 = self.current_figure.axes[:3]  # Get the first 3 axes
+            self.update_stft_spect_plot(ax1, ax2, ax3)
 
     def plot_filter_response(self):
             filter_type = self.filter_type.currentText()
@@ -901,7 +1003,12 @@ class ControlMenu(QDialog):
         # Only move window on simple click (not drag)
         if hasattr(event, 'pressed') and event.pressed:
             return
-            
+        
+        # Stop live analysis if running
+        if hasattr(self, 'is_live_analysis_running') and self.is_live_analysis_running:
+            self.live_analysis_timer.stop()
+            self.is_live_analysis_running = False
+        
         # Update window center position
         self.mid_point_idx = np.searchsorted(self.time, event.xdata)
         self.update_stft_spect_plot(ax1, ax2, ax3)
@@ -1400,12 +1507,18 @@ class ControlMenu(QDialog):
         
         # Clear the list
         self.plot_windows.clear()
+
+        if hasattr(self, 'live_analysis_timer'):
+            self.live_analysis_timer.stop()
         
         # Close figures
         if hasattr(self, 'current_figure') and self.current_figure:
             plt.close(self.current_figure)
         
         event.accept()
+        super().closeEvent(event)
+
+
 
 
 
