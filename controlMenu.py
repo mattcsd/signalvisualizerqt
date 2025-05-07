@@ -11,7 +11,6 @@ import numpy as np
 import sounddevice as sd
 import librosa
 from scipy import signal
-import parselmouth
 import matplotlib as mpl
 from pitchAdvancedSettings import AdvancedSettings
 from PyQt5.QtWidgets import QVBoxLayout
@@ -1294,6 +1293,8 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+    
+
     def plot_pitch(self):
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
@@ -1302,27 +1303,53 @@ class ControlMenu(QDialog):
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle('Pitch Contour')
         
-        write('temp_pitch.wav', self.fs, self.audio)
-        snd = parselmouth.Sound('temp_pitch.wav')
+        # No need to write to file - we can work directly with the audio array
+        audio = self.audio.astype(np.float32)  # Ensure correct dtype for librosa
         
+        # Plot waveform
+        ax[0].plot(self.time, audio)
+        
+        # Calculate pitch using librosa
         if method == 'Autocorrelation':
-            pitch = snd.to_pitch_ac(pitch_floor=min_pitch, pitch_ceiling=max_pitch)
+            # Using librosa's yin algorithm (similar to autocorrelation)
+            pitch_values, voiced_flag, voiced_probs = librosa.pyin(
+                audio, 
+                fmin=min_pitch, 
+                fmax=max_pitch,
+                sr=self.fs
+            )
         elif method == 'Cross-correlation':
-            pitch = snd.to_pitch_cc(pitch_floor=min_pitch, pitch_ceiling=max_pitch)
-        elif method == 'Subharmonics':
-            pitch = snd.to_pitch_shs(minimum_pitch=min_pitch, ceiling=max_pitch)
-        elif method == 'Spinet':
-            pitch = snd.to_pitch_spinet(ceiling=max_pitch)
+            # Using librosa's default pitch tracking (which uses STFT-based approach)
+            pitch_values = librosa.yin(
+                audio,
+                fmin=min_pitch,
+                fmax=max_pitch,
+                sr=self.fs
+            )
+        else:
+            # For other methods, you might need additional libraries
+            # For example, for subharmonics you could use crepe
+            raise NotImplementedError(f"Method {method} not implemented with librosa")
         
-        pitch_values = pitch.selected_array['frequency']
-        pitch_values[pitch_values == 0] = np.nan
+        # Create time array for pitch frames
+        hop_length = 512  # default for librosa
+        frame_time = librosa.frames_to_time(
+            np.arange(len(pitch_values)),
+            sr=self.fs,
+            hop_length=hop_length
+        )
         
-        ax[0].plot(self.time, self.audio)
-        ax[1].plot(pitch.xs(), pitch_values, '-')
-        ax[1].set(xlim=[0, self.duration], ylim=[min_pitch, max_pitch], 
-                 xlabel='Time (s)', ylabel='Frequency (Hz)')
+        # Plot pitch contour
+        ax[1].plot(frame_time, pitch_values, '-')
+        ax[1].set(
+            xlim=[0, self.duration],
+            ylim=[min_pitch, max_pitch],
+            xlabel='Time (s)',
+            ylabel='Frequency (Hz)'
+        )
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+        
     def plot_spectral_centroid(self):
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
