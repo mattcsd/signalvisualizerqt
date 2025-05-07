@@ -137,6 +137,12 @@ class Start(QMainWindow):
         options_menu = menubar.addMenu("Options")
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
+        tuner_menu = menubar.addMenu("Tuner")
+        tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Live STFT'))
+        examples_menu = menubar.addMenu("Examples")
+        examples_menu.addAction("Lute", lambda: self.initialize_frame('Lute'))
+
+
     def closeEvent(self, event):
         """Handle the window close event."""
         reply = QMessageBox.question(

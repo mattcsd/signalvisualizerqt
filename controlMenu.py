@@ -52,6 +52,10 @@ class ControlMenu(QDialog):
         self.plot_windows = []  # Track all plot windows
         self.selected_span = None  # Track span selection times
 
+        self.audio_player = None
+        self.is_playing = False
+        self.setup_audio()
+
         np.seterr(divide='ignore')
         self.span = None
         self.setupUI()
@@ -97,6 +101,53 @@ class ControlMenu(QDialog):
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
+
+    def setup_audio(self):
+        """Verify audio system and initialize"""
+        try:
+            # Test with a beep
+            test_tone = np.sin(2 * np.pi * 440 * np.arange(44100)/44100)
+            sd.play(test_tone, 44100)
+            sd.wait()
+            print("Audio system working!")
+            self.audio_working = True
+        except Exception as e:
+            print(f"Audio error: {e}")
+            self.audio_working = False
+
+    def play_from_current_position(self):
+        """Safe audio playback from cursor position"""
+        if not hasattr(self, 'audio_working') or not self.audio_working:
+            if not self.test_audio_system():
+                return
+        
+        import sounddevice as sd
+        
+        # Stop any existing playback
+        self.stop_audio()
+        
+        # Get current position
+        start_sample = int(self.mid_point_idx)
+        audio_chunk = self.audio[start_sample:]
+        
+        # Normalize audio
+        if np.max(np.abs(audio_chunk)) > 1.0:
+            audio_chunk = audio_chunk / np.max(np.abs(audio_chunk))
+        
+        # Start playback
+        try:
+            sd.play(audio_chunk, self.fs, blocking=False)
+            self.is_playing = True
+            self.playback_start_time = time.time()
+            self.playback_start_sample = start_sample
+            
+            # Start position updater
+            if not hasattr(self, 'playback_timer'):
+                self.playback_timer = QTimer()
+                self.playback_timer.timeout.connect(self.update_playback_position)
+            self.playback_timer.start(50)
+        except Exception as e:
+            print(f"Audio playback failed: {e}")
 
     def show_help(self):
         """Properly shows and activates the help window"""
@@ -263,37 +314,176 @@ class ControlMenu(QDialog):
             self.live_analysis_btn.setText("▶ Start Live Analysis")
             self.stop_live_analysis()
 
+
     def start_live_analysis(self):
-        """Start the live analysis scrolling"""
+        """Start live analysis with safety checks"""
+        if not hasattr(self, 'current_figure') or not plt.fignum_exists(self.current_figure.number):
+            print("No valid plot window available")
+            return
+        
         if not hasattr(self, 'live_timer'):
             self.live_timer = QTimer()
             self.live_timer.timeout.connect(self.update_live_position)
-        self.live_timer.start(100)  # Update every 100ms
+        
+        # Initialize audio playback
+        self.play_from_current_position()
+        
+        self.live_timer.start(100)
+        self.live_analysis_btn.setText("⏹ Stop Live Analysis")
 
-    def stop_live_analysis(self):
-        """Stop the live analysis scrolling"""
-        if hasattr(self, 'live_timer'):
-            self.live_timer.stop()
 
-    def update_live_position(self):
-        """Move the analysis window forward"""
-        if not hasattr(self, 'wind_size_samples'):
+    def test_audio_system(self):
+        print("TESTING AUDIO")
+        """Test if audio system works with a simple tone"""
+        try:
+            fs = 44100
+            duration = 1.0  # seconds
+            t = np.linspace(0, duration, int(fs * duration), endpoint=False)
+            tone = 0.5 * np.sin(2 * np.pi * 440 * t)  # 440Hz sine wave
+            
+            print("Playing test tone - you should hear a 1-second beep...")
+            sd.play(tone, fs)
+            sd.wait()
+            return True
+        except Exception as e:
+            print(f"Audio test failed: {e}")
+            return False
+
+    def update_playback_position(self):
+        """Update cursor position based on audio playback"""
+        if not hasattr(self, 'playback_start_time'):
             return
         
-        # Move window by 10% of its size each step
-        step = int(self.wind_size_samples * 0.1)
-        self.mid_point_idx = min(self.mid_point_idx + step, 
-                               len(self.audio) - self.wind_size_samples//2)
+        # Calculate current position
+        elapsed = time.time() - self.playback_start_time
+        self.mid_point_idx = self.playback_start_sample + int(elapsed * self.fs)
         
-        # Update the display
+        # Update visualization
         if hasattr(self, 'current_figure'):
             ax1, ax2, ax3 = self.current_figure.axes[:3]
             self.update_stft_spect_plot(ax1, ax2, ax3)
         
-        # Auto-stop at end of audio
+        # Check if reached end
+        if self.mid_point_idx >= len(self.audio):
+            self.stop_audio_playback()
+            self.live_analysis_btn.setText("▶ Play Audio")
+
+
+    def start_audio_playback(self):
+        """Start audio playback from current cursor position"""
+        if not hasattr(self, 'audio_enabled') or not self.audio_enabled:
+            if not self.test_audio_system():
+                print("Audio playback disabled - system not working")
+                return
+        
+        # Calculate start position
+        start_sample = int(self.mid_point_idx)
+        audio_segment = self.audio[start_sample:]
+        
+        # Normalize if needed
+        if np.max(np.abs(audio_segment)) > 1.0:
+            audio_segment = audio_segment / np.max(np.abs(audio_segment))
+        
+        # Start playback
+        sd.stop()  # Stop any existing playback
+        self.audio_player = sd.play(audio_segment, self.fs, blocking=False)
+        self.is_playing_audio = True
+        
+        # Store playback info
+        self.playback_start_time = time.time()
+        self.playback_start_sample = start_sample
+        
+        # Start position updater if needed
+        if not hasattr(self, 'playback_timer'):
+            self.playback_timer = QTimer()
+            self.playback_timer.timeout.connect(self.update_playback_position)
+        self.playback_timer.start(50)  # Update every 50ms
+
+    def stop_audio_playback(self):
+        """Stop any ongoing audio playback"""
+        import sounddevice as sd
+        sd.stop()
+        self.is_playing_audio = False
+        if hasattr(self, 'playback_timer'):
+            self.playback_timer.stop()
+
+
+    def play_audio_segment(self, start_sample, end_sample):
+        """Play a segment of audio without blocking"""
+        import sounddevice as sd
+        segment = self.audio[start_sample:end_sample]
+        
+        # Basic audio normalization
+        if np.max(np.abs(segment)) > 1.0:
+            segment = segment / np.max(np.abs(segment))
+        
+        # Store playback info
+        self.current_playback = sd.play(segment, self.fs, blocking=False)
+        self.playback_start_time = time.time()
+        self.playback_start_sample = start_sample
+
+    def stop_all_audio(self):
+        """Stop any ongoing audio playback"""
+        import sounddevice as sd
+        sd.stop()
+        if hasattr(self, 'current_playback'):
+            del self.current_playback
+
+    def stop_live_analysis(self):
+        """Comprehensive cleanup for live analysis"""
+        # Stop audio first
+        self.stop_audio()
+        
+        # Stop timer if it exists
+        if hasattr(self, 'live_timer'):
+            try:
+                self.live_timer.stop()
+            except:
+                pass
+        
+        # Update UI
+        if hasattr(self, 'live_analysis_btn'):
+            try:
+                self.live_analysis_btn.setChecked(False)
+                self.live_analysis_btn.setText("▶ Start Live Analysis")
+            except:
+                pass
+
+    def stop_audio(self):
+        """Stop all audio playback"""
+        import sounddevice as sd
+        if hasattr(self, 'is_playing') and self.is_playing:
+            sd.stop()
+            self.is_playing = False
+        if hasattr(self, 'playback_timer'):
+            self.playback_timer.stop()
+
+    def update_live_position(self):
+        """Safe position update with window checks"""
+        if not hasattr(self, 'wind_size_samples'):
+            return
+        
+        # Check if window still exists
+        if not hasattr(self, 'current_figure') or not plt.fignum_exists(self.current_figure.number):
+            self.stop_live_analysis()
+            return
+        
+        # Update position
+        elapsed = time.time() - self.playback_start_time
+        self.mid_point_idx = self.playback_start_sample + int(elapsed * self.fs)
+        
+        try:
+            # Safe visualization update
+            ax1, ax2, ax3 = self.current_figure.axes[:3]
+            self.update_stft_spect_plot(ax1, ax2, ax3)
+        except (AttributeError, RuntimeError) as e:
+            print(f"Visual update failed: {e}")
+            self.stop_live_analysis()
+        
+        # Auto-stop at end
         if self.mid_point_idx >= len(self.audio) - self.wind_size_samples//2:
-            self.live_analysis_btn.setChecked(False)
-            self.toggle_live_analysis()
+            self.stop_live_analysis()
+
 
     def create_pitch_group(self, layout):
         group = QGroupBox("Pitch")
@@ -1218,6 +1408,8 @@ class ControlMenu(QDialog):
     def create_span_selector(self, ax, audio_signal, plot_id):
         """Create a span selector for a specific plot window"""
         def onselect(xmin, xmax):
+
+            self.stop_all_audio()
             start_sample = int(xmin * self.fs)
             end_sample = int(xmax * self.fs)
             segment = audio_signal[start_sample:end_sample]
@@ -1437,6 +1629,7 @@ class ControlMenu(QDialog):
 
 
     def show_plot_window(self, figure, waveform_ax, audio_signal):
+        """Show plot window with proper close handling"""
         method = self.method_selector.currentText()
         start, end = 0, self.duration
         plot_title = f"{method}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
@@ -1445,6 +1638,11 @@ class ControlMenu(QDialog):
         plot_dialog.setWindowTitle(plot_title)
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
         plot_dialog.plot_id = id(plot_dialog)
+        
+        # Store references
+        plot_dialog.figure = figure
+        plot_dialog.waveform_ax = waveform_ax
+        self.current_figure = figure
 
         layout = QVBoxLayout()
         canvas = FigureCanvas(figure)
@@ -1453,12 +1651,37 @@ class ControlMenu(QDialog):
         layout.addWidget(canvas)
         plot_dialog.setLayout(layout)
 
-        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)  # ← pass correct refs
-
-        plot_dialog.destroyed.connect(lambda: self.cleanup_plot_window(plot_dialog.plot_id))
+        # Connect close handler
+        def handle_close():
+            self.on_plot_window_close(plot_dialog.plot_id)
+        plot_dialog.finished.connect(handle_close)
+        
+        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
+        return plot_dialog
 
+    def on_plot_window_close(self, plot_id):
+        """Handle plot window closure"""
+        # Stop live analysis if active
+        if hasattr(self, 'live_timer') and self.live_timer.isActive():
+            self.stop_live_analysis()
+        
+        # Clean up span selectors
+        if plot_id in self.span_selectors:
+            for selector in self.span_selectors[plot_id]:
+                try:
+                    selector.disconnect_events()
+                except:
+                    pass
+            del self.span_selectors[plot_id]
+        
+        # Remove window reference
+        self.plot_windows = [w for w in self.plot_windows if getattr(w, 'plot_id', None) != plot_id]
+        
+        # Clear current figure if it's the one being closed
+        if hasattr(self, 'current_figure') and id(self.current_figure) == plot_id:
+            del self.current_figure
 
 
     def get_window(self, size):
