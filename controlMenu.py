@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from scipy.io.wavfile import write
 from help import Help
 from pathlib import Path
+import time
 
 
 
@@ -116,23 +117,41 @@ class ControlMenu(QDialog):
 
     def play_from_current_position(self):
         """Safe audio playback from cursor position"""
-        if not hasattr(self, 'audio_working') or not self.audio_working:
-            if not self.test_audio_system():
-                return
-        
+
         import sounddevice as sd
         
         # Stop any existing playback
         self.stop_audio()
-        
+    
+        self.mid_point_idx = 0
+        self.playback_start_sample = 0
+
+        # if i want to start 0 the line is here::!!
         # Get current position
-        start_sample = int(self.mid_point_idx)
-        audio_chunk = self.audio[start_sample:]
+        #start_sample = int(self.mid_point_idx)
+        audio_chunk = self.audio  # full track
+
+        if len(audio_chunk) == 0:
+            print("Empty audio_chunk — skipping playback")
+            return
         
         # Normalize audio
         if np.max(np.abs(audio_chunk)) > 1.0:
             audio_chunk = audio_chunk / np.max(np.abs(audio_chunk))
         
+
+        # Validate audio shape and dtype
+        if self.audio.ndim > 1:
+            print(f"Converting multichannel audio with shape {self.audio.shape} to mono.")
+            audio_chunk = np.mean(audio_chunk, axis=1)
+
+        # Check for NaNs or silence
+        if not np.any(audio_chunk):
+            print("Audio chunk is silent or empty!")
+            return
+
+        print(f"Audio length: {len(self.audio)}, sample rate: {self.fs}")
+
         # Start playback
         try:
             sd.play(audio_chunk, self.fs, blocking=False)
@@ -198,38 +217,6 @@ class ControlMenu(QDialog):
             except RuntimeError:
                 continue  # Skip deleted windows
 
-    def createSpanSelector(self, ax):
-        if self.span is not None:
-            try:
-                self.span.disconnect_events()
-            except:
-                pass
-            self.span = None
-        
-        def on_select(xmin, xmax):
-            idx_min = np.argmax(self.time >= xmin)
-            idx_max = np.argmax(self.time >= xmax)
-            
-            if idx_max > idx_min:
-                self.selected_span = (xmin, xmax)
-                # Update CONTROLLER window title
-                self.setWindowTitle(
-                    f"{self.base_name}_{self.format_timestamp(xmin)}-{self.format_timestamp(xmax)}"
-                )
-                # Update all open PLOT windows
-                #self.update_plot_window_titles()
-                # Play the selected audio
-                sd.play(self.audio[idx_min:idx_max], self.fs)
-        
-        self.span = SpanSelector(
-            ax,
-            on_select,
-            'horizontal',
-            useblit=True,
-            interactive=True,
-            drag_from_anywhere=True
-        )
-
     def create_spectrogram_group(self, layout):
         group = QGroupBox("Spectrogram")
         grid = QGridLayout()
@@ -265,21 +252,6 @@ class ControlMenu(QDialog):
         
         self.show_pitch = QCheckBox("Show Pitch")
         self.show_pitch.stateChanged.connect(self.toggle_pitch_controls)
-
-        self.live_analysis_btn = QPushButton("▶ Start Live Analysis")  # ▶ is a play symbol
-        self.live_analysis_btn.setCheckable(True)  # Makes it a toggle button
-        self.live_analysis_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                padding: 5px;
-            }
-            QPushButton:checked {
-                background-color: #ffcccc;
-            }
-        """)
-
-        self.live_analysis_btn.clicked.connect(self.toggle_live_analysis)
         
         grid.addWidget(QLabel("Window:"), 0, 0)
         grid.addWidget(self.window_type, 0, 1)
@@ -296,57 +268,51 @@ class ControlMenu(QDialog):
         grid.addWidget(QLabel("Drawing style:"), 6, 0)
         grid.addWidget(self.draw_style, 6, 1)
         grid.addWidget(self.show_pitch, 7, 0, 1, 2)
-
-        grid.addWidget(self.live_analysis_btn, 8, 0, 1, 2)  # Span across both columns
         
         group.setLayout(grid)
         layout.addWidget(group, 1, 0, 8, 2)
 
     def toggle_live_analysis(self):
-        """Toggle the live analysis mode on/off"""
-        if self.live_analysis_btn.isChecked():
+        """Toggle live analysis mode for STFT windows"""
+        # Get which button was clicked
+        sender = self.sender()
+        
+        if sender.isChecked():
             # Button was toggled ON
-            self.live_analysis_btn.setText("⏹ Stop Live Analysis")  # ⏹ is stop symbol
+            sender.setText("⏹ Stop Live Analysis")
             self.start_live_analysis()
         else:
             # Button was toggled OFF
-            self.live_analysis_btn.setText("▶ Start Live Analysis")
+            sender.setText("▶ Start Live Analysis")
             self.stop_live_analysis()
 
-
     def start_live_analysis(self):
-        """Start live analysis with safety checks"""
-        if not hasattr(self, 'current_figure') or not plt.fignum_exists(self.current_figure.number):
-            print("No valid plot window available")
+        """Start live analysis for STFT windows"""
+        # Get the button that triggered this
+        sender = self.sender()
+        
+        # Find the parent plot dialog
+        parent = sender.parent()
+        while parent and not isinstance(parent, QDialog):
+            parent = parent.parent()
+        
+        if not parent:
+            print("Couldn't find STFT plot window")
             return
         
+        # Store reference to current window
+        self.current_live_window = parent
+        
+        # Initialize analysis
         if not hasattr(self, 'live_timer'):
             self.live_timer = QTimer()
             self.live_timer.timeout.connect(self.update_live_position)
         
-        # Initialize audio playback
+        # Start audio playback
         self.play_from_current_position()
         
+        # Start timer
         self.live_timer.start(100)
-        self.live_analysis_btn.setText("⏹ Stop Live Analysis")
-
-
-    def test_audio_system(self):
-        print("TESTING AUDIO")
-        """Test if audio system works with a simple tone"""
-        try:
-            fs = 44100
-            duration = 1.0  # seconds
-            t = np.linspace(0, duration, int(fs * duration), endpoint=False)
-            tone = 0.5 * np.sin(2 * np.pi * 440 * t)  # 440Hz sine wave
-            
-            print("Playing test tone - you should hear a 1-second beep...")
-            sd.play(tone, fs)
-            sd.wait()
-            return True
-        except Exception as e:
-            print(f"Audio test failed: {e}")
-            return False
 
     def update_playback_position(self):
         """Update cursor position based on audio playback"""
@@ -355,8 +321,9 @@ class ControlMenu(QDialog):
         
         # Calculate current position
         elapsed = time.time() - self.playback_start_time
-        self.mid_point_idx = self.playback_start_sample + int(elapsed * self.fs)
+        self.mid_point_idx = min(len(self.audio) - 1, self.playback_start_sample + int(elapsed * self.fs))        
         
+
         # Update visualization
         if hasattr(self, 'current_figure'):
             ax1, ax2, ax3 = self.current_figure.axes[:3]
@@ -370,11 +337,9 @@ class ControlMenu(QDialog):
 
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
-        if not hasattr(self, 'audio_enabled') or not self.audio_enabled:
-            if not self.test_audio_system():
-                print("Audio playback disabled - system not working")
-                return
-        
+
+        self.mid_point_idx = 0
+        self.playback_start_sample = 0
         # Calculate start position
         start_sample = int(self.mid_point_idx)
         audio_segment = self.audio[start_sample:]
@@ -429,7 +394,7 @@ class ControlMenu(QDialog):
             del self.current_playback
 
     def stop_live_analysis(self):
-        """Comprehensive cleanup for live analysis"""
+        """Stop live analysis for STFT windows"""
         # Stop audio first
         self.stop_audio()
         
@@ -440,13 +405,11 @@ class ControlMenu(QDialog):
             except:
                 pass
         
-        # Update UI
-        if hasattr(self, 'live_analysis_btn'):
-            try:
-                self.live_analysis_btn.setChecked(False)
-                self.live_analysis_btn.setText("▶ Start Live Analysis")
-            except:
-                pass
+        # Update all STFT window buttons
+        for window in self.plot_windows:
+            if hasattr(window, 'live_analysis_btn'):
+                window.live_analysis_btn.setChecked(False)
+                window.live_analysis_btn.setText("▶ Start Live Analysis")
 
     def stop_audio(self):
         """Stop all audio playback"""
@@ -469,8 +432,9 @@ class ControlMenu(QDialog):
         
         # Update position
         elapsed = time.time() - self.playback_start_time
-        self.mid_point_idx = self.playback_start_sample + int(elapsed * self.fs)
+        self.mid_point_idx = min(len(self.audio) - 1, self.playback_start_sample + int(elapsed * self.fs))        
         
+
         try:
             # Safe visualization update
             ax1, ax2, ax3 = self.current_figure.axes[:3]
@@ -669,24 +633,6 @@ class ControlMenu(QDialog):
         
         self.filter_response_button.setEnabled(filtering_enabled)
 
-    def toggle_live_analysis(self):
-        """Toggle continuous scrolling analysis mode"""
-        if not hasattr(self, 'live_analysis_timer'):
-            # Create timer if it doesn't exist
-            self.live_analysis_timer = QTimer()
-            self.live_analysis_timer.timeout.connect(self.update_live_analysis)
-        
-        if hasattr(self, 'is_live_analysis_running') and self.is_live_analysis_running:
-            # Stop live analysis
-            self.live_analysis_timer.stop()
-            self.is_live_analysis_running = False
-        else:
-            # Start live analysis
-            self.is_live_analysis_running = True
-            self.live_analysis_speed = 100  # ms between updates (adjust as needed)
-            self.live_analysis_timer.start(self.live_analysis_speed)
-
-
     def update_live_analysis(self):
         """Move analysis window forward in time"""
         if not hasattr(self, 'wind_size_samples'):
@@ -698,7 +644,11 @@ class ControlMenu(QDialog):
         
         # Check if we've reached the end
         if self.mid_point_idx + self.wind_size_samples//2 >= len(self.audio):
-            self.mid_point_idx = self.wind_size_samples//2  # Wrap around to start
+            if hasattr(self, 'live_analysis_timer'):
+                self.live_analysis_timer.stop()
+                self.is_live_analysis_running = False
+            self.mid_point_idx = 0
+            return
             if hasattr(self, 'live_analysis_timer'):
                 self.live_analysis_timer.stop()
                 self.is_live_analysis_running = False
@@ -880,6 +830,10 @@ class ControlMenu(QDialog):
         # Only move window on simple click (not drag)
         if hasattr(event, 'pressed') and event.pressed:
             return
+
+        self.mid_point_idx = np.searchsorted(self.time, event.xdata)
+        self.mid_point_idx = min(self.mid_point_idx, len(self.time) - 1)
+
             
         # Update window center position
         self.mid_point_idx = np.searchsorted(self.time, event.xdata)
@@ -921,6 +875,8 @@ class ControlMenu(QDialog):
         stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
         freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
         
+
+
         # Plotting with matched dimensions
         ax[0].plot(self.time, self.audio)
         ax[0].axvspan(time_segment[0], time_segment[-1], 
@@ -1103,8 +1059,61 @@ class ControlMenu(QDialog):
                                bbox=dict(boxstyle='round,pad=0.2', 
                                        fc='black', alpha=0.7))
 
+
+    def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
+        """Create a specialized dialog for STFT plots with live analysis button"""
+        plot_dialog = QDialog(self)
+        plot_dialog.setWindowTitle("STFT Analysis")
+        plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
+        plot_dialog.plot_id = id(plot_dialog)
+        
+        # Create main layout
+        main_layout = QVBoxLayout()
+        
+        # Add live analysis button at the top (only for STFT windows)
+        live_btn = QPushButton("▶ Start Live Analysis")
+        live_btn.setCheckable(True)
+        live_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                padding: 5px;
+                margin: 5px;
+            }
+            QPushButton:checked {
+                background-color: #ffcccc;
+            }
+        """)
+        live_btn.clicked.connect(self.toggle_live_analysis)
+        main_layout.addWidget(live_btn)
+        
+        # Add the figure canvas and toolbar
+        canvas = FigureCanvas(figure)
+        toolbar = NavigationToolbar(canvas, plot_dialog)
+        main_layout.addWidget(toolbar)
+        main_layout.addWidget(canvas)
+        
+        plot_dialog.setLayout(main_layout)
+        
+        # Store references
+        plot_dialog.figure = figure
+        plot_dialog.waveform_ax = waveform_ax
+        plot_dialog.live_analysis_btn = live_btn
+        
+        # Set up span selector
+        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
+        
+        # Connect close handler
+        plot_dialog.destroyed.connect(lambda: self.cleanup_plot_window(plot_dialog.plot_id))
+        
+        # Add to windows list
+        self.plot_windows.append(plot_dialog)
+        
+        plot_dialog.show()
+        return plot_dialog
+
     def plot_stft_spect(self):
-        """STFT + Spectrogram with interactive window selection"""
+        """STFT + Spectrogram with interactive window selection and live analysis button"""
         try:
             wind_size = float(self.window_size.text())
             overlap = float(self.overlap.text())
@@ -1113,15 +1122,15 @@ class ControlMenu(QDialog):
             max_freq = int(self.max_freq.text())
             draw_style = self.draw_style.currentIndex() + 1
             
-            # Create figure with adjusted layout - taller spectrogram
-            self.current_figure = plt.figure(figsize=(12, 8))  # Increased figure height (from 6 to 8)
+            # Create figure with adjusted layout
+            self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(3, 2, width_ratios=[15, 1], height_ratios=[1, 1, 1.5], hspace=0.4)
             ax1 = plt.subplot(gs[0, 0])
             ax2 = plt.subplot(gs[1, 0])
-            ax3 = plt.subplot(gs[2, 0], sharex=ax1)  # Share x-axis with ax1
-            cbar_ax = plt.subplot(gs[:, 1])  # Colorbar uses entire right column
+            ax3 = plt.subplot(gs[2, 0], sharex=ax1)
+            cbar_ax = plt.subplot(gs[:, 1])
             
-            self.current_figure.suptitle('STFT + Spectrogram', y=0.98)  # Adjust title position
+            self.current_figure.suptitle('STFT + Spectrogram', y=0.98)
             
             # Ensure time and audio arrays match
             if len(self.time) > len(self.audio):
@@ -1134,6 +1143,8 @@ class ControlMenu(QDialog):
             self.hop_size = self.wind_size_samples - int(overlap * self.fs)
             self.window = self.get_window(self.wind_size_samples)
             self.nfft_val = nfft
+
+            #CHECK FOR START
             self.mid_point_idx = len(self.audio) // 2  # Start in middle
             
             # Create initial spectrogram image
@@ -1159,7 +1170,7 @@ class ControlMenu(QDialog):
             ax3.set_ylabel('Frequency (Hz)', fontsize=10)
             ax3.tick_params(axis='both', which='major', labelsize=8)
             
-            # Create colorbar once on the dedicated axis
+            # Create colorbar
             self.cbar = self.current_figure.colorbar(self.img, cax=cbar_ax, format="%+2.0f dB")
             
             # Initial plot
@@ -1180,9 +1191,12 @@ class ControlMenu(QDialog):
                 lambda e: self.on_window_click_spect(e, ax1, ax2, ax3)
             )
             
-            self.show_plot_window(self.current_figure, ax1, self.audio)            
+            # Create and show the plot dialog with live analysis button
+            plot_dialog = self.create_stft_plot_dialog(self.current_figure, ax1, self.audio)
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
+
 
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
@@ -1192,6 +1206,10 @@ class ControlMenu(QDialog):
         # Only move window on simple click (not drag)
         if hasattr(event, 'pressed') and event.pressed:
             return
+
+        self.mid_point_idx = np.searchsorted(self.time, event.xdata)
+        self.mid_point_idx = min(self.mid_point_idx, len(self.time) - 1)
+
         
         # Stop live analysis if running
         if hasattr(self, 'is_live_analysis_running') and self.is_live_analysis_running:
@@ -1207,6 +1225,11 @@ class ControlMenu(QDialog):
         # Clear only the plots we need to update (not the spectrogram)
         ax1.clear()
         ax2.clear()
+
+        if self.mid_point_idx >= len(self.time):
+            self.stop_live_analysis()
+            return
+
         
         # Current analysis window with boundary checks
         start = max(0, self.mid_point_idx - self.wind_size_samples//2)
@@ -1235,8 +1258,9 @@ class ControlMenu(QDialog):
         # Plot time domain with highlighted window
         ax1.plot(self.time, self.audio)
         ax1.axvspan(time_segment[0], time_segment[-1], color='lightblue', alpha=0.3)
-        ax1.axvline(self.time[self.mid_point_idx], color='red', ls='--')
-        
+        if self.mid_point_idx < len(self.time):
+            ax1.axvline(self.time[self.mid_point_idx], color='red', ls='--')
+                
         # Plot STFT
         ax2.plot(freqs, 20*np.log10(stft + 1e-10))
         ax2.set(xlim=[0, self.fs/2], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
@@ -1642,7 +1666,12 @@ class ControlMenu(QDialog):
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def cleanup_plot_window(self, plot_id):
-        """Clean up resources when plot window closes"""
+        """Clean up when any plot window closes"""
+        # Stop live analysis if active
+        if hasattr(self, 'live_timer') and self.live_timer.isActive():
+            self.stop_live_analysis()
+        
+        # Clean up span selectors
         if plot_id in self.span_selectors:
             for selector in self.span_selectors[plot_id]:
                 try:
@@ -1651,9 +1680,12 @@ class ControlMenu(QDialog):
                     pass
             del self.span_selectors[plot_id]
         
-        self.plot_windows = [w for w in self.plot_windows 
-                            if hasattr(w, 'plot_id') and w.plot_id != plot_id]
-
+        # Remove window reference
+        self.plot_windows = [w for w in self.plot_windows if getattr(w, 'plot_id', None) != plot_id]
+        
+        # Clear current figure if it's the one being closed
+        if hasattr(self, 'current_figure') and id(self.current_figure) == plot_id:
+            del self.current_figure
 
     def show_plot_window(self, figure, waveform_ax, audio_signal):
         """Show plot window with proper close handling"""
