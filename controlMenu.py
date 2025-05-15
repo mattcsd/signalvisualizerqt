@@ -361,7 +361,7 @@ class ControlMenu(QDialog):
         if not hasattr(self, 'playback_timer'):
             self.playback_timer = QTimer()
             self.playback_timer.timeout.connect(self.update_playback_position)
-        self.playback_timer.start(50)  # Update every 50ms
+        self.playback_timer.start(16)  # Update every 50ms
 
     def stop_audio_playback(self):
         """Stop any ongoing audio playback"""

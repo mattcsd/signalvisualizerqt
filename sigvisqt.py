@@ -15,6 +15,7 @@ from generateSawtoothWave import SawtoothWave
 from optionsSpectrogram import Spectrogram
 from pitchAdvancedSettings import AdvancedSettings
 from auxiliar import Auxiliar
+from tuner import Tuner
 
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases
@@ -93,6 +94,8 @@ class Start(QMainWindow):
             self.frames['SawtoothWave'] = SawtoothWave(self.container, self)
         elif page_name == 'Spectrogram':
             self.frames['Spectrogram'] = Spectrogram(self.container, self)
+        elif page_name == 'Tuner':
+            self.frames['Tuner'] = Tuner(self.container, self)
 
         # Show the frame
         self.show_frame(page_name)
@@ -138,9 +141,42 @@ class Start(QMainWindow):
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
         tuner_menu = menubar.addMenu("Tuner")
-        tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Live STFT'))
+        tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
+
+
         examples_menu = menubar.addMenu("Examples")
         examples_menu.addAction("Lute", lambda: self.initialize_frame('Lute'))
+
+    def launch_tuner(self):
+        """Launch the live audio tuner"""
+        try:
+            # First check if we already have a tuner running
+            if hasattr(self, 'tuner_window') and self.tuner_window.isVisible():
+                self.tuner_window.raise_()
+                return
+            
+            # Import the tuner module if it's in a separate file
+            from your_tuner_module import TunerWindow
+            
+            # Create and show the tuner window
+            self.tuner_window = TunerWindow(parent=self)
+            self.tuner_window.show()
+            
+            # Connect close event for cleanup
+            self.tuner_window.destroyed.connect(self.cleanup_tuner)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not launch tuner: {str(e)}")
+
+    def cleanup_tuner(self):
+        """Clean up tuner resources"""
+        if hasattr(self, 'tuner_window'):
+            try:
+                self.tuner_window.close()
+                self.tuner_window.deleteLater()
+            except:
+                pass
+            del self.tuner_window
 
 
     def closeEvent(self, event):
