@@ -6,7 +6,7 @@ import soundfile as sf
 import sounddevice as sd
 from scipy.io.wavfile import write
 from pathlib import Path
-from PyQt5.QtWidgets import (QApplication, QDialog, QLabel, QPushButton, 
+from PyQt5.QtWidgets import (QApplication, QWidget, QDialog, QLabel, QPushButton, 
                             QVBoxLayout, QHBoxLayout, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont  # Added import
@@ -16,7 +16,8 @@ from matplotlib.figure import Figure
 from matplotlib.widgets import SpanSelector, Button
 from controlMenu import ControlMenu
 
-class Record(QDialog):
+
+class Record(QWidget):  # Changed from QDialog to QWidget
     def __init__(self, master, controller):
         super().__init__(master)
         self.controller = controller
@@ -40,11 +41,11 @@ class Record(QDialog):
         control_layout = QHBoxLayout()
         
         self.record_button = QPushButton("⏺")
-        self.record_button.setFont(QFont("Arial", 30, QFont.Bold))  # Fixed this line
+        self.record_button.setFont(QFont("Arial", 30, QFont.Bold))
         self.record_button.clicked.connect(self.start_recording)
         
         self.stop_button = QPushButton("⏹")
-        self.stop_button.setFont(QFont("Arial", 30, QFont.Bold))  # Fixed this line
+        self.stop_button.setFont(QFont("Arial", 30, QFont.Bold))
         self.stop_button.clicked.connect(self.stop_recording)
         self.stop_button.setEnabled(False)
         
@@ -57,22 +58,29 @@ class Record(QDialog):
         control_layout.addStretch()
         control_layout.addWidget(self.help_button)
         
-        # Timer display
         self.time_label = QLabel("00:00")
         self.time_label.setAlignment(Qt.AlignCenter)
-        self.time_label.setFont(QFont("", 30))  # Fixed this line
+        self.time_label.setFont(QFont("", 30))
         
-        # Timer for updating display
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_time_display)
+
+        self.auto_stop_timer = QTimer(self)  # NEW: Auto stop timer
+        self.auto_stop_timer.setSingleShot(True)
+        self.auto_stop_timer.timeout.connect(self.stop_recording)
         
-        # Figure setup
         self.fig = Figure(figsize=(8, 4))
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
+
+        self.load_button = QPushButton("Load to controller")
+        self.load_button.setVisible(False)
+        self.load_button.clicked.connect(self.load_to_controller)
+        main_layout.addWidget(self.load_button)
+
+
         self.toolbar = NavigationToolbar(self.canvas, self)
         
-        # Initially hide the plot until recording is done
         self.canvas.setVisible(False)
         self.toolbar.setVisible(False)
         
@@ -89,22 +97,24 @@ class Record(QDialog):
         self.isrecording = True
         self.frames = []
         self.recording_start_time = time.time()
-        self.timer.start(200)  # Update timer every 200ms
         
-        # Start recording in a separate thread
+        self.timer.start(200)
+        self.auto_stop_timer.start(30_000)  # ⏱ Auto-stop after 30 seconds
+        
         self.recording_thread = threading.Thread(target=self.record_audio)
         self.recording_thread.start()
         
     def stop_recording(self):
+        if not self.isrecording:
+            return
+        
+        self.isrecording = False
         self.record_button.setEnabled(True)
         self.stop_button.setEnabled(False)
-        self.isrecording = False
         self.timer.stop()
+        self.auto_stop_timer.stop()
         
-        # Wait for recording thread to finish
         self.recording_thread.join()
-        
-        # Process and plot the recording
         self.process_recording()
         
     def record_audio(self):
@@ -131,20 +141,16 @@ class Record(QDialog):
         self.time_label.setText(f"{mins:02d}:{secs:02d}")
         
     def process_recording(self):
-        # Convert recorded frames to numpy array
         rec_int = np.frombuffer(b"".join(self.frames), dtype=np.int16)
         duration = len(rec_int) / self.fs
         time_axis = np.linspace(0, duration, len(rec_int))
         
-        # Save as WAV file
+        # Save and reload as float
         recording_dir = Path("wav")
         recording_dir.mkdir(exist_ok=True)
         write(recording_dir / "recording.wav", self.fs, rec_int)
-        
-        # Read back as float32 for processing
         rec_float, _ = sf.read(recording_dir / "recording.wav", dtype='float32')
         
-        # Plot the recording
         self.ax.clear()
         self.ax.plot(time_axis, rec_int)
         self.ax.set(
@@ -156,56 +162,66 @@ class Record(QDialog):
         self.ax.axhline(y=0, color='black', linewidth=0.5, linestyle='--')
         self.ax.grid(True, linestyle=':', alpha=0.5)
         
-        # Add load button
-        self.add_load_button(rec_float, duration)
-        
-        # Setup audio selection
         self.setup_span_selector(time_axis, rec_float)
-        
-        # Show the plot
         self.canvas.setVisible(True)
         self.toolbar.setVisible(True)
         self.canvas.draw()
-        
-    def add_load_button(self, audio, duration):
-        # Remove existing button if it exists
-        if hasattr(self, 'load_button_ax'):
-            self.fig.delaxes(self.load_button_ax)
-            
-        # Create button axes
-        self.load_button_ax = self.fig.add_axes([0.8, 0.01, 0.15, 0.05])
-        self.load_button = Button(self.load_button_ax, 'Load to Controller')
-        
-        def on_load(event):
-            if self.selectedAudio.shape == (1,):  # No selection, use entire audio
-                audio_to_load = self.ax.lines[0].get_ydata()
-                duration_to_load = len(audio_to_load) / self.fs
-            else:
+        self.load_button.setVisible(True)
+
+    def load_to_controller(self):
+        """Load recorded audio (or selection) into a new ControlMenu window."""
+        try:
+            # Determine what audio to load
+            if hasattr(self, 'selectedAudio') and len(self.selectedAudio) > 1:
                 audio_to_load = self.selectedAudio
-                duration_to_load = len(audio_to_load) / self.fs
-                
-            # Create control menu
-            cm = ControlMenu("Recording", self.fs, audio_to_load, duration_to_load, self.controller)
-            cm.show()
-            self.close()
+            else:
+                audio_to_load, _ = sf.read("wav/recording.wav", dtype='float32')
             
-        self.load_button.on_clicked(on_load)
-        
+            duration = len(audio_to_load) / self.fs
+            title = "Recording"
+
+            # Fallback if controller isn't properly initialized
+            if not hasattr(self.controller, 'adse'):
+                from PyQt5.QtWidgets import QWidget
+                self.controller = QWidget()
+                self.controller.adse = type('', (), {})()
+                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+
+            # Create ControlMenu window
+            control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
+
+            # Track open windows
+            if not hasattr(self, 'control_windows'):
+                self.control_windows = []
+            self.control_windows.append(control_window)
+
+            # Clean up when window is closed
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window)
+                if control_window in self.control_windows else None
+            )
+
+            control_window.show()
+            control_window.activateWindow()
+
+        except Exception as e:
+            print(f"Error loading to controller: {e}")
+            QMessageBox.critical(self, "Error", f"Could not load to controller:\n{str(e)}")
+
+
     def setup_span_selector(self, time_axis, audio):
-        # Remove existing span selector if it exists
         if hasattr(self, 'span'):
             self.span.disconnect_events()
             del self.span
-            
+
         def on_select(xmin, xmax):
             if len(audio) <= 1:
                 return
-                
             idx_min = np.argmax(time_axis >= xmin)
             idx_max = np.argmax(time_axis >= xmax)
             self.selectedAudio = audio[idx_min:idx_max]
             sd.play(self.selectedAudio, self.fs)
-            
+
         self.span = SpanSelector(
             self.ax,
             on_select,
@@ -213,16 +229,4 @@ class Record(QDialog):
             useblit=True,
             interactive=True,
             drag_from_anywhere=True
-        )
-        
-    def show_help(self):
-        QMessageBox.information(
-            self,
-            "Recording Help",
-            "Audio Recorder Help\n\n"
-            "1. Click the record button (⏺) to start recording\n"
-            "2. Click the stop button (⏹) to stop recording\n"
-            "3. Select a portion of the recording to play just that section\n"
-            "4. Click 'Load to Controller' to send the audio to the control menu\n"
-            "   - If no selection is made, the entire recording will be loaded"
         )

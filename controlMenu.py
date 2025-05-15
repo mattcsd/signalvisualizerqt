@@ -45,9 +45,6 @@ class ControlMenu(QDialog):
         self.setMinimumSize(800, 600)  # Force reasonable size
         self.setModal(False)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        
-        # This is the magic flag combination that always works:
-        #self.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint)
 
         self.plot_windows = []  # Track all plot windows
         self.selected_span = None  # Track span selection times
@@ -59,8 +56,6 @@ class ControlMenu(QDialog):
         np.seterr(divide='ignore')
         self.span = None
         self.setupUI()
-
-        print("PAST CONSTRUCTOR")
 
     def setupUI(self):
         self.setWindowTitle(self.base_name)
@@ -101,19 +96,6 @@ class ControlMenu(QDialog):
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
-
-    def setup_audio(self):
-        """Verify audio system and initialize"""
-        try:
-            # Test with a beep
-            test_tone = np.sin(2 * np.pi * 440 * np.arange(44100)/44100)
-            sd.play(test_tone, 44100)
-            sd.wait()
-            print("Audio system working!")
-            self.audio_working = True
-        except Exception as e:
-            print(f"Audio error: {e}")
-            self.audio_working = False
 
     def play_from_current_position(self):
         """Safe audio playback from cursor position"""
