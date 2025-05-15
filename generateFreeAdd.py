@@ -386,12 +386,6 @@ class FreeAdditionPureTones(QDialog):
         except Exception as e:
             print(f"Audio error: {e}")
 
-
-    def closeEvent(self, event):
-        """Clean up when closing"""
-        self.audio_queue.put((None, None))  # Stop audio thread
-        super().closeEvent(event)
-
     def notesHarmonics(self, note_value):
         """Handle piano key presses with the new note numbering"""
         octave = self.octave_spinbox.value()
@@ -418,52 +412,6 @@ class FreeAdditionPureTones(QDialog):
         else:
             self.piano.close()  # This triggers our close handler
 
-    #maybe needs to go
-    '''
-    def setup_span_selector(self, signal, duration):
-        """Setup the span selector for audio selection"""
-        if hasattr(self, 'span'):
-            self.span.remove()
-            del self.span
-        
-        time = np.linspace(0, duration, len(signal), endpoint=False)
-        
-        def onselect(xmin, xmax):
-            if not hasattr(self, 'full_audio') or len(self.full_audio) <= 1:
-                return
-                
-            ini, end = np.searchsorted(time, (xmin, xmax))
-            selected_audio = self.full_audio[ini:end+1].copy()
-            
-            # Store the selected span for the title
-            self.selected_span = (xmin, xmax)
-            
-            # Apply fade to prevent clicks
-            fade_samples = min(int(0.02 * self.fs), len(selected_audio)//4)
-            if fade_samples > 0:
-                fade_in = np.linspace(0, 1, fade_samples) ** 2
-                fade_out = np.linspace(1, 0, fade_samples) ** 2
-                selected_audio[:fade_samples] *= fade_in
-                selected_audio[-fade_samples:] *= fade_out
-            
-            self.selectedAudio = selected_audio
-            
-            # Play with proper stream management
-            try:
-                sd.stop()
-                sd.play(selected_audio, self.fs, blocking=False)
-            except Exception as e:
-                print(f"Playback error: {e}")
-        
-        self.span = SpanSelector(
-            self.ax,
-            onselect,
-            'horizontal',
-            useblit=True,
-            interactive=True,
-            drag_from_anywhere=True
-        )
-    '''
     def plotFAPT(self):
         duration = self.getDuration()
         samples = int(duration * self.fs)
@@ -616,6 +564,10 @@ class FreeAdditionPureTones(QDialog):
         minutes, seconds = divmod(seconds, 60)
         return f"{int(minutes):02d}:{seconds:06.3f}"
 
+    def closeEvent(self, event):
+        """Clean up when closing"""
+        self.audio_queue.put((None, None))  # Stop audio thread
+        super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -107,22 +107,71 @@ class SquareWave(QWidget):
         
         self.save_button = QPushButton('Save')
         self.help_button = QPushButton('🛈')
+        self.controller_button = QPushButton('Load to Controller')
         self.plot_button = QPushButton('Plot')
         
         self.help_button.setFixedWidth(30)
         
         btn_layout.addWidget(self.save_button)
         btn_layout.addStretch(1)
+        btn_layout.addWidget(self.controller_button)
         btn_layout.addWidget(self.help_button)
         btn_layout.addWidget(self.plot_button)
 
         self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(3))
         self.plot_button.clicked.connect(self.plotSquareWave)
+        self.controller_button.clicked.connect(self.load_to_controller)
         self.save_button.clicked.connect(self.saveDefaults)
         
         layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
         
         return layout
+
+    def load_to_controller(self):
+        """Load the generated square wave to a new controller window"""
+        try:
+            # Ensure the waveform is freshly generated
+            self.plotSquareWave()
+            
+            # Use selected span if valid, otherwise full audio
+            audio_to_load = (
+                self.selectedAudio if self.selectedAudio.size > 1 else self.selectedAudio
+            )
+            duration = self.sliders['Duration (s)'].value() / 100
+            fs = self.default_values['fs']
+            
+            # Compose title from key parameters
+            frequency = self.sliders['Frequency (Hz)'].value()
+            duty = self.sliders['Duty Cycle'].value() / 100
+            title = f"Square Wave {frequency}Hz (Duty: {duty:.2f})"
+            
+            # Check if controller is set up
+            if not hasattr(self.controller, 'adse'):
+                from PyQt5.QtWidgets import QWidget
+                self.controller = QWidget()
+                self.controller.adse = type('', (), {})()
+                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+            
+            # Create controller window
+            control_window = ControlMenu(title, fs, audio_to_load, duration, self.controller)
+            
+            # Track window for cleanup
+            if not hasattr(self, 'control_windows'):
+                self.control_windows = []
+            self.control_windows.append(control_window)
+            
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window)
+                if control_window in self.control_windows else None
+            )
+            
+            control_window.show()
+            control_window.activateWindow()
+            
+        except Exception as e:
+            print(f"Error loading square wave to controller: {e}")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Could not load to controller: {str(e)}")
 
     def plotSquareWave(self):
         # Clear any existing span selector first

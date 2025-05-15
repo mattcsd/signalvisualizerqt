@@ -92,7 +92,6 @@ class SawtoothWave(QWidget):
         sd.stop()
         sd.play(self.selectedAudio[idx_min:idx_max], fs)
 
-
     def create_controls(self):
         layout = QGridLayout()
         layout.setVerticalSpacing(8)
@@ -114,24 +113,26 @@ class SawtoothWave(QWidget):
         
         self.save_button = QPushButton('Save')
         self.help_button = QPushButton('🛈')
+        self.controller_button = QPushButton('Load to Controller')
         self.plot_button = QPushButton('Plot')
         
         self.help_button.setFixedWidth(30)
         
         btn_layout.addWidget(self.save_button)
         btn_layout.addStretch(1)
+        btn_layout.addWidget(self.controller_button)
         btn_layout.addWidget(self.help_button)
         btn_layout.addWidget(self.plot_button)
 
         
         self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(4))
         self.plot_button.clicked.connect(self.plotSawtoothWave)
+        self.controller_button.clicked.connect(self.load_to_controller)
         self.save_button.clicked.connect(self.saveDefaults)
         
         layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
         
         return layout
-
 
     def plotSawtoothWave(self):
         # Clear any existing span selector first
@@ -200,6 +201,52 @@ class SawtoothWave(QWidget):
         input_field.returnPressed.connect(lambda: self.update_slider_from_input(slider, input_field, is_int))
         slider.valueChanged.connect(lambda v: input_field.setText(f"{v/100:.2f}" if not is_int else f"{v}"))
         return input_field
+
+    def load_to_controller(self):
+        """Load the generated sawtooth wave to a new controller window."""
+        try:
+            # Ensure the waveform is freshly generated with current slider values
+            self.plotSawtoothWave()
+
+            # Use selected span if valid, otherwise full audio
+            audio_to_load = (
+                self.selectedAudio if self.selectedAudio.size > 1 else self.selectedAudio
+            )
+            duration = self.sliders['Duration (s)'].value() / 100
+            fs = self.default_values['fs']
+
+            # Compose a descriptive title
+            frequency = self.sliders['Frequency (Hz)'].value()
+            maxpos = self.sliders['Max Position'].value() / 100
+            title = f"Sawtooth Wave {frequency}Hz (MaxPos: {maxpos:.2f})"
+
+            # Check if controller is defined
+            if not hasattr(self.controller, 'adse'):
+                from PyQt5.QtWidgets import QWidget
+                self.controller = QWidget()
+                self.controller.adse = type('', (), {})()
+                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+
+            # Create and show the controller window
+            control_window = ControlMenu(title, fs, audio_to_load, duration, self.controller)
+
+            # Optional: Track and clean up the controller window
+            if not hasattr(self, 'control_windows'):
+                self.control_windows = []
+            self.control_windows.append(control_window)
+
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window)
+                if control_window in self.control_windows else None
+            )
+
+            control_window.show()
+            control_window.activateWindow()
+
+        except Exception as e:
+            print(f"Error loading sawtooth wave to controller: {e}")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Could not load to controller:\n{str(e)}")
 
     def update_plot(self):
         self.plotSawtoothWave()
