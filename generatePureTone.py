@@ -9,10 +9,12 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.widgets import SpanSelector, Button, RadioButtons
-
+from pitchAdvancedSettings import AdvancedSettings
 from auxiliar import Auxiliar
 from controlMenu import ControlMenu
 from help import Help
+from pathlib import Path
+import numpy as np
 
 import os
 
@@ -146,7 +148,7 @@ class PureTone(QDialog):
         # Buttons layout
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(QPushButton('Save', clicked=self.saveDefaults))
-        btn_layout.addWidget(QPushButton('Plot', clicked=self.plotPureTone))
+        btn_layout.addWidget(QPushButton('Load to Controller', clicked=self.load_to_controller))
         btn_layout.addStretch(1)
         btn_layout.addWidget(QPushButton('Default Values', clicked=self.reset_to_defaults))
         btn_layout.addWidget(QPushButton('🛈 Help', clicked=self.showHelp))
@@ -154,6 +156,57 @@ class PureTone(QDialog):
         layout.addLayout(btn_layout, len(self.sliders), 1, 1, 3)
         
         return layout
+
+    def load_to_controller(self):
+        """Load the generated pure tone to a new controller window"""
+        try:
+            # First ensure we have the latest audio data
+            self.plotPureTone()
+            
+            # Get parameters
+            duration = self.sliders['Duration (s)'].value() / 100
+            fs = self.default_values['fs']
+            audio_to_load = self.selectedAudio
+            
+            # Create window title with parameters
+            params = {
+                'freq': self.sliders['Frequency (Hz)'].value(),
+                'amp': self.sliders['Amplitude'].value() / 100,
+                'phase': self.sliders['Phase (π rad)'].value() / 100,
+                'offset': self.sliders['Offset'].value() / 100
+            }
+            title = f"Pure Tone {params['freq']}Hz"
+            
+            # Create a minimal controller if the main controller isn't properly set up
+            if not hasattr(self.controller, 'adse'):
+                from PyQt5.QtWidgets import QWidget
+                self.controller = QWidget()  # Create a minimal controller
+                self.controller.adse = type('', (), {})()  # Create a dummy adse object
+                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+            
+            # Create new control window
+            control_window = ControlMenu(title, fs, audio_to_load, duration, self.controller)
+            
+            # Store reference to the control window if needed (similar to inputLoad.py)
+            if not hasattr(self, 'control_windows'):
+                self.control_windows = []
+            self.control_windows.append(control_window)
+            
+            # Cleanup handler when window is closed
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window) 
+                if control_window in self.control_windows else None
+            )
+            
+            control_window.show()
+            control_window.activateWindow()
+        
+        except Exception as e:
+            print(f"Error loading to controller: {e}")
+            # Optionally show an error message to the user
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Could not load to controller: {str(e)}")
+        
 
     def update_expression(self):
         """Update the mathematical expression display"""
@@ -205,9 +258,6 @@ class PureTone(QDialog):
         
         # Reinitialize span selector after new plot
         self.setupAudioInteractions()
-
-
-
 
 
 

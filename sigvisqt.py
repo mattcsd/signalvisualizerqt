@@ -15,7 +15,6 @@ from generateSawtoothWave import SawtoothWave
 from optionsSpectrogram import Spectrogram
 from pitchAdvancedSettings import AdvancedSettings
 from auxiliar import Auxiliar
-from tuner import Tuner
 
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases

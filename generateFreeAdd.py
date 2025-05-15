@@ -135,7 +135,7 @@ class FreeAdditionPureTones(QDialog):
         for text, callback in buttons:
             btn = QPushButton(text)
             btn.clicked.connect(callback)
-            btn.setMaximumWidth(80)
+            btn.setMaximumWidth(100 if text == 'Load to Controller' else 80)
             btn_layout.addWidget(btn)
             if text == 'Piano':  # Store reference to piano button
                 self.piano_btn = btn
@@ -154,6 +154,7 @@ class FreeAdditionPureTones(QDialog):
         main_layout.addWidget(self.canvas)
         
         self.setLayout(main_layout)
+
     def showHelp(self):
         """Show help window for this module"""
         if hasattr(self, 'help') and self.help:
@@ -334,7 +335,6 @@ class FreeAdditionPureTones(QDialog):
         note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
         return f"{note_names[note_value % 12]}{octave}"
 
-
     def _audio_worker(self):
         """Background thread for smooth audio playback"""
         while True:
@@ -418,8 +418,52 @@ class FreeAdditionPureTones(QDialog):
         else:
             self.piano.close()  # This triggers our close handler
 
+    #maybe needs to go
+    '''
+    def setup_span_selector(self, signal, duration):
+        """Setup the span selector for audio selection"""
+        if hasattr(self, 'span'):
+            self.span.remove()
+            del self.span
         
-
+        time = np.linspace(0, duration, len(signal), endpoint=False)
+        
+        def onselect(xmin, xmax):
+            if not hasattr(self, 'full_audio') or len(self.full_audio) <= 1:
+                return
+                
+            ini, end = np.searchsorted(time, (xmin, xmax))
+            selected_audio = self.full_audio[ini:end+1].copy()
+            
+            # Store the selected span for the title
+            self.selected_span = (xmin, xmax)
+            
+            # Apply fade to prevent clicks
+            fade_samples = min(int(0.02 * self.fs), len(selected_audio)//4)
+            if fade_samples > 0:
+                fade_in = np.linspace(0, 1, fade_samples) ** 2
+                fade_out = np.linspace(1, 0, fade_samples) ** 2
+                selected_audio[:fade_samples] *= fade_in
+                selected_audio[-fade_samples:] *= fade_out
+            
+            self.selectedAudio = selected_audio
+            
+            # Play with proper stream management
+            try:
+                sd.stop()
+                sd.play(selected_audio, self.fs, blocking=False)
+            except Exception as e:
+                print(f"Playback error: {e}")
+        
+        self.span = SpanSelector(
+            self.ax,
+            onselect,
+            'horizontal',
+            useblit=True,
+            interactive=True,
+            drag_from_anywhere=True
+        )
+    '''
     def plotFAPT(self):
         duration = self.getDuration()
         samples = int(duration * self.fs)
@@ -454,10 +498,9 @@ class FreeAdditionPureTones(QDialog):
         self.addLoadButton(signal, duration)
         
         self.canvas.draw()
- 
-
 
     def addLoadButton(self, audio, duration):
+        """Add a 'Load to Controller' button to the matplotlib figure"""
         # Remove previous button if exists
         if hasattr(self, 'load_btn_ax'):
             self.load_btn_ax.remove()
@@ -469,33 +512,13 @@ class FreeAdditionPureTones(QDialog):
         self.audio_duration = duration
         
         # Create new button
-        self.load_btn_ax = self.fig.add_axes([0.8, 0.01, 0.09, 0.05])
-        self.load_btn = Button(self.load_btn_ax, 'Load')
+        self.load_btn_ax = self.fig.add_axes([0.8, 0.01, 0.15, 0.05])  # Position and size
+        self.load_btn = Button(self.load_btn_ax, 'Load to Controller')
         
-        def load(event):
-            if hasattr(self, 'selectedAudio') and len(self.selectedAudio) > 1:
-                durSelec = len(self.selectedAudio) / self.fs
-                self.cm = ControlMenu()
-                self.cm.createControlMenu(
-                    'Free addition of pure tones',
-                    self.fs,
-                    self.selectedAudio,
-                    durSelec,
-                    self.controller
-                )
-            else:
-                self.cm = ControlMenu()
-                self.cm.createControlMenu(
-                    'Free addition of pure tones',
-                    self.fs,
-                    self.full_audio,
-                    self.audio_duration,
-                    self.controller
-                )
+        # Connect the button to our load_to_controller method
+        self.load_btn.on_clicked(lambda event: self.load_to_controller())
         
-        self.load_btn.on_clicked(load)
-        
-        # Span selector for audio playback
+        # Span selector for audio playback and selection
         time = np.linspace(0, duration, len(audio), endpoint=False)
         
         def onselect(xmin, xmax):
@@ -504,6 +527,9 @@ class FreeAdditionPureTones(QDialog):
                 
             ini, end = np.searchsorted(time, (xmin, xmax))
             selected_audio = self.full_audio[ini:end+1].copy()
+            
+            # Store the selected span for the title
+            self.selected_span = (xmin, xmax)
             
             # Apply fade to prevent clicks
             fade_samples = min(int(0.02 * self.fs), len(selected_audio)//4)
@@ -532,6 +558,64 @@ class FreeAdditionPureTones(QDialog):
         )
         
         self.canvas.draw()
+            
+    def load_to_controller(self):
+        """Load the current audio to controller (standalone method)"""
+        try:
+            # First ensure we have audio data
+            if not hasattr(self, 'full_audio'):
+                self.plotFAPT()  # Regenerate the audio if needed
+            
+            # Determine which audio to load (selected or full)
+            if hasattr(self, 'selectedAudio') and len(self.selectedAudio) > 1:
+                audio_to_load = self.selectedAudio
+                duration = len(self.selectedAudio) / self.fs
+                # Get the time span for the title if available
+                if hasattr(self, 'selected_span'):
+                    start_time, end_time = self.selected_span
+                    title = f"Free Addition {self.format_timestamp(start_time)}-{self.format_timestamp(end_time)}"
+                else:
+                    title = "Free Addition (selection)"
+            else:
+                audio_to_load = self.full_audio
+                duration = self.audio_duration
+                title = "Free Addition"
+            
+            # Create a minimal controller if needed
+            if not hasattr(self.controller, 'adse'):
+                from PyQt5.QtWidgets import QWidget
+                self.controller = QWidget()
+                self.controller.adse = type('', (), {})()
+                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+            
+            # Create new control window
+            control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
+            
+            # Store reference to the control window
+            if not hasattr(self, 'control_windows'):
+                self.control_windows = []
+            self.control_windows.append(control_window)
+            
+            # Cleanup handler
+            control_window.destroyed.connect(
+                lambda: self.control_windows.remove(control_window) 
+                if control_window in self.control_windows else None
+            )
+            
+            control_window.show()
+            control_window.activateWindow()
+        
+        except Exception as e:
+            print(f"Error loading to controller: {e}")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Could not load to controller: {str(e)}")
+
+    # Add this helper method to your class if not already present
+    def format_timestamp(self, seconds):
+        """Format seconds into MM:SS.mmm format"""
+        minutes, seconds = divmod(seconds, 60)
+        return f"{int(minutes):02d}:{seconds:06.3f}"
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
