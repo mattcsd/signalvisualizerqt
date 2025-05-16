@@ -20,8 +20,6 @@ from pathlib import Path
 import time
 
 
-
-
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
         super().__init__(None)
@@ -51,7 +49,6 @@ class ControlMenu(QDialog):
 
         self.audio_player = None
         self.is_playing = False
-        self.setup_audio()
 
         np.seterr(divide='ignore')
         self.span = None
@@ -581,7 +578,10 @@ class ControlMenu(QDialog):
                                spectral_centroid_enabled or show_filtering_spectrograms)
         self.draw_style.setEnabled(spectrogram_enabled or stft_spect_enabled or 
                                  spectral_centroid_enabled or filtering_enabled)
-        self.show_pitch.setEnabled(spectrogram_enabled)
+        self.show_pitch.setEnabled(
+            spectrogram_enabled or stft_spect_enabled or 
+            (filtering_enabled and hasattr(self, 'waveform_radio') and not self.waveform_radio.isChecked()))
+
         
         # Rest of the method remains the same...
         # STE controls
@@ -714,7 +714,9 @@ class ControlMenu(QDialog):
             ax2.set_xlabel('Frequency [Hz]')
             ax2.grid(True)
             
-            self.show_plot_window()
+            plt.tight_layout()
+            plt.show()
+
 
     # [Rest of your methods remain unchanged...]
         # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
@@ -871,44 +873,47 @@ class ControlMenu(QDialog):
         
         self.current_figure.canvas.draw()
 
-    def calculate_pitch(self):
-        """Calculate pitch using YIN algorithm with current librosa version"""
+    def calculate_pitch(self, signal=None):
+        """Calculate pitch using YIN algorithm with optional signal override."""
         try:
+            # Use provided signal or default to self.audio
+            if signal is None:
+                signal = self.audio
+
             # Get parameters from UI
             min_pitch = float(self.min_pitch.text())
             max_pitch = float(self.max_pitch.text())
             
-            # Convert audio to mono if needed and normalize
-            audio = np.mean(self.audio, axis=1) if len(self.audio.shape) > 1 else self.audio
-            audio = librosa.util.normalize(audio)
+            # Convert to mono if stereo and normalize
+            signal = np.mean(signal, axis=1) if signal.ndim > 1 else signal
+            signal = librosa.util.normalize(signal)
             
-            # Calculate pitch using YIN algorithm
+            # Calculate pitch using YIN
             f0, voiced_flag, voiced_probs = librosa.pyin(
-                audio,
+                signal,
                 fmin=min_pitch,
                 fmax=max_pitch,
                 sr=self.fs,
                 frame_length=2048,
                 hop_length=512,
-                fill_na=np.nan  # Fill unvoiced frames with NaN
+                fill_na=np.nan
             )
             
-            # Simple smoothing using median filter (replacement for librosa.util.smooth)
+            # Median filter smoothing
             if len(f0) > 0:
                 from scipy.ndimage import median_filter
                 f0_smoothed = median_filter(f0, size=5)
                 f0_smoothed[~voiced_flag] = np.nan
             else:
                 f0_smoothed = f0
-                
-            return f0, f0_smoothed
             
+            return f0, f0_smoothed
+
         except Exception as e:
             QMessageBox.warning(self, "Pitch Error", f"Could not calculate pitch: {str(e)}")
-            # Return arrays of NaN with appropriate length
-            dummy_length = len(self.audio) // 512  # Approximate number of frames
+            dummy_length = len(signal) // 512 if signal is not None else 100
             return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
-    
+
     def validate_spectrogram_parameters(self):
         """Validate spectrogram parameters and return calculated values"""
         # Get parameters from UI
@@ -1000,12 +1005,14 @@ class ControlMenu(QDialog):
                                                fmin=min_freq, fmax=max_freq, ax=ax1)
             
             fig.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
-            self.annotate_brightest_frequencies(ax1, S_db, hop_size, nfft)
+            
+            #is not very accurate
+            #self.annotate_brightest_frequencies(ax1, S_db, hop_size, nfft)
 
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
                 pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
-                ax1.plot(pitch_times, pitch_values, '-', color='red', linewidth=2, alpha=0.8)
+                ax1.plot(pitch_times, pitch_values, '-', color='green', linewidth=2, alpha=0.8)
 
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
@@ -1013,8 +1020,7 @@ class ControlMenu(QDialog):
             self.show_plot_window(fig, ax0, audio)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
-
-
+    '''
     def annotate_brightest_frequencies(self, ax, S_db, hop_length, nfft):
         """Annotate the top 3 brightest frequencies at each time frame"""
         # Find time points (every 0.5 seconds for cleaner display)
@@ -1040,7 +1046,7 @@ class ControlMenu(QDialog):
                                fontsize=8,
                                bbox=dict(boxstyle='round,pad=0.2', 
                                        fc='black', alpha=0.7))
-
+    '''
 
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
         """Create a specialized dialog for STFT plots with live analysis button"""
@@ -1179,7 +1185,6 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
-
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
         if event.inaxes != ax1 or event.button != 1 or event.dblclick:
@@ -1300,7 +1305,6 @@ class ControlMenu(QDialog):
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
     
-
     def plot_pitch(self):
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
@@ -1481,7 +1485,7 @@ class ControlMenu(QDialog):
         self.span_selectors[plot_id].append(selector)
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
-        """Plot original and filtered spectrograms with proper span selectors"""
+        """Plot original and filtered spectrograms with optional pitch curves."""
         try:
             # Validate parameters and get calculated values
             params = self.validate_spectrogram_parameters()
@@ -1490,91 +1494,103 @@ class ControlMenu(QDialog):
             nfft = params['nfft']
             min_freq = params['min_freq']
             max_freq = params['max_freq']
-            
-            # Get remaining parameters
+
+            show_pitch = self.show_pitch.isChecked()
             draw_style = self.draw_style.currentIndex() + 1
-            window_name = self.window_type.currentText()
-            
+            window = self.get_window(wind_size_samples)
+
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
             plot_id = id(self.current_figure.canvas.manager.window)
-            
-            window = self.get_window(wind_size_samples)
-            # Get unique identifier for this plot window
-            plot_id = id(self.current_figure.canvas.manager.window)
-            
-            # Original spectrogram
+
+            # ---- ORIGINAL SPECTROGRAM ----
             ax0 = plt.subplot(gs[0])
             img0 = None
             if draw_style == 1:
                 D_orig = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size,
-                                     win_length=wind_size_samples, window=window)
+                                      win_length=wind_size_samples, window=window)
                 S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
+                
+
                 img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='linear',
-                                              sr=self.fs, hop_length=hop_size,
-                                              fmin=min_freq, fmax=max_freq, ax=ax0)
+                                                sr=self.fs, hop_length=hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax0)
             else:
                 S_orig = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
-                                                      n_fft=nfft, hop_length=hop_size,
-                                                      win_length=wind_size_samples,
-                                                      window=window, fmin=min_freq,
-                                                      fmax=max_freq)
+                                                        n_fft=nfft, hop_length=hop_size,
+                                                        win_length=wind_size_samples,
+                                                        window=window, fmin=min_freq,
+                                                        fmax=max_freq)
                 S_db_orig = librosa.power_to_db(S_orig, ref=np.max)
                 img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='mel',
-                                              sr=self.fs, hop_length=hop_size,
-                                              fmin=min_freq, fmax=max_freq, ax=ax0)
+                                                sr=self.fs, hop_length=hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax0)
+            # correction  for the lengths
+            duration = librosa.frames_to_time(S_db_orig.shape[1], sr=self.fs, hop_length=hop_size)
+            ax0.set_xlim([0, duration])
             
+
             ax0.set(title='Original Signal Spectrogram')
+            #not work
             self.create_span_selector(ax0, self.audio, plot_id)
-            
-            # Filtered spectrogram
+
+            if show_pitch:
+                _, pitch_smoothed = self.calculate_pitch(signal=self.audio)
+                pitch_times = librosa.times_like(pitch_smoothed, sr=self.fs, hop_length=hop_size)
+                ax0.plot(pitch_times, pitch_smoothed, '-', color='lime', linewidth=2, alpha=0.9, label='Pitch')
+
+
+            # ---- FILTERED SPECTROGRAM ----
             ax1 = plt.subplot(gs[1])
             img1 = None
             if draw_style == 1:
                 D_filt = librosa.stft(filtered_signal, n_fft=nfft, hop_length=hop_size,
-                                    win_length=wind_size_samples, window=window)
+                                      win_length=wind_size_samples, window=window)
                 S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
                 img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='linear',
-                                              sr=self.fs, hop_length=hop_size,
-                                              fmin=min_freq, fmax=max_freq, ax=ax1)
+                                                sr=self.fs, hop_length=hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax1)
             else:
                 S_filt = librosa.feature.melspectrogram(y=filtered_signal, sr=self.fs,
-                                                       n_fft=nfft, hop_length=hop_size,
-                                                       win_length=wind_size_samples,
-                                                       window=window, fmin=min_freq,
-                                                       fmax=max_freq)
+                                                        n_fft=nfft, hop_length=hop_size,
+                                                        win_length=wind_size_samples,
+                                                        window=window, fmin=min_freq,
+                                                        fmax=max_freq)
                 S_db_filt = librosa.power_to_db(S_filt, ref=np.max)
                 img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='mel',
-                                              sr=self.fs, hop_length=hop_size,
-                                              fmin=min_freq, fmax=max_freq, ax=ax1)
-            
+                                                sr=self.fs, hop_length=hop_size,
+                                                fmin=min_freq, fmax=max_freq, ax=ax1)
+            duration_filt = librosa.frames_to_time(S_db_filt.shape[1], sr=self.fs, hop_length=hop_size)
+            ax1.set_xlim([0, duration_filt])
+
             ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
-            self.create_span_selector(ax1, filtered_signal, plot_id)
             
-            # Add colorbars only if images were created successfully
+            self.create_span_selector(ax1, filtered_signal, plot_id)
+
+            if show_pitch:
+                _, pitch_smoothed_filt = self.calculate_pitch(signal=filtered_signal)
+                pitch_times_filt = librosa.times_like(pitch_smoothed_filt, sr=self.fs, hop_length=hop_size)
+                ax1.plot(pitch_times_filt, pitch_smoothed_filt, '-', color='cyan', linewidth=2, alpha=0.9, label='Pitch')
+                 #ax1.legend(loc='upper right')
+            '''
+            # ---- COLORBARS ----
             if img0 is not None and img1 is not None:
-                # Adjust layout to make room for colorbars
                 self.current_figure.subplots_adjust(right=0.85)
-                
-                # Add colorbar for original spectrogram
                 cbar_ax0 = self.current_figure.add_axes([0.88, 0.55, 0.02, 0.35])
                 self.current_figure.colorbar(img0, cax=cbar_ax0, format="%+2.0f dB")
                 cbar_ax0.set_ylabel('Original Signal')
-                
-                # Add colorbar for filtered spectrogram
+
                 cbar_ax1 = self.current_figure.add_axes([0.88, 0.15, 0.02, 0.35])
                 self.current_figure.colorbar(img1, cax=cbar_ax1, format="%+2.0f dB")
                 cbar_ax1.set_ylabel('Filtered Signal')
-            
+            '''
             self.current_figure.tight_layout()
             self.show_plot_window(self.current_figure, ax1, self.audio)
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
             if self.current_figure:
                 plt.close(self.current_figure)
-
-
 
 
     def plot_filtering(self):
@@ -1724,7 +1740,6 @@ class ControlMenu(QDialog):
         if hasattr(self, 'current_figure') and id(self.current_figure) == plot_id:
             del self.current_figure
 
-
     def get_window(self, size):
         window_type = self.window_type.currentText()
         
@@ -1759,7 +1774,6 @@ class ControlMenu(QDialog):
             segment = np.pad(segment, (0, pad_size), 'constant')
         
         return segment, time_range
-
 
     def closeEvent(self, event):
         # Close all plot windows
