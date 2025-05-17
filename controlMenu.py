@@ -313,7 +313,6 @@ class ControlMenu(QDialog):
             self.stop_audio_playback()
             self.live_analysis_btn.setText("▶ Play Audio")
 
-
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
 
@@ -350,7 +349,6 @@ class ControlMenu(QDialog):
         if hasattr(self, 'playback_timer'):
             self.playback_timer.stop()
 
-
     def play_audio_segment(self, start_sample, end_sample):
         """Play a segment of audio without blocking"""
         import sounddevice as sd
@@ -366,11 +364,13 @@ class ControlMenu(QDialog):
         self.playback_start_sample = start_sample
 
     def stop_all_audio(self):
-        """Stop any ongoing audio playback"""
-        import sounddevice as sd
-        sd.stop()
-        if hasattr(self, 'current_playback'):
-            del self.current_playback
+        try:
+            if hasattr(self, 'active_stream') and self.active_stream:
+                self.active_stream.stop()
+                self.active_stream.close()
+                self.active_stream = None
+        except Exception as e:
+            print(f"Error stopping audio: {e}")
 
     def stop_live_analysis(self):
         """Stop live analysis for STFT windows"""
@@ -425,7 +425,6 @@ class ControlMenu(QDialog):
         # Auto-stop at end
         if self.mid_point_idx >= len(self.audio) - self.wind_size_samples//2:
             self.stop_live_analysis()
-
 
     def create_pitch_group(self, layout):
         group = QGroupBox("Pitch")
@@ -615,32 +614,6 @@ class ControlMenu(QDialog):
         
         self.filter_response_button.setEnabled(filtering_enabled)
 
-    def update_live_analysis(self):
-        """Move analysis window forward in time"""
-        if not hasattr(self, 'wind_size_samples'):
-            return
-        
-        # Calculate next position
-        step_size = int(self.wind_size_samples * 0.1)  # Move 10% of window size each step
-        self.mid_point_idx += step_size
-        
-        # Check if we've reached the end
-        if self.mid_point_idx + self.wind_size_samples//2 >= len(self.audio):
-            if hasattr(self, 'live_analysis_timer'):
-                self.live_analysis_timer.stop()
-                self.is_live_analysis_running = False
-            self.mid_point_idx = 0
-            return
-            if hasattr(self, 'live_analysis_timer'):
-                self.live_analysis_timer.stop()
-                self.is_live_analysis_running = False
-            return
-        
-        # Update the plot
-        if hasattr(self, 'current_figure') and self.current_figure:
-            ax1, ax2, ax3 = self.current_figure.axes[:3]  # Get the first 3 axes
-            self.update_stft_spect_plot(ax1, ax2, ax3)
-
     def plot_filter_response(self):
             filter_type = self.filter_type.currentText()
             percentage = float(self.percentage.text())
@@ -717,7 +690,6 @@ class ControlMenu(QDialog):
             plt.tight_layout()
             plt.show()
 
-
     # [Rest of your methods remain unchanged...]
         # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
         # All other existing methods should be kept exactly as they were in the previous implementation
@@ -768,41 +740,33 @@ class ControlMenu(QDialog):
         try:
             wind_size = float(self.window_size.text())
             nfft = int(self.nfft.currentText())
-            
+
             self.current_figure, ax = plt.subplots(2, figsize=(12,6))
             self.current_figure.suptitle('STFT Analysis')
-            
-            # Ensure time and audio arrays match
+
+            # Trim mismatched lengths
             if len(self.time) > len(self.audio):
                 self.time = self.time[:len(self.audio)]
             elif len(self.audio) > len(self.time):
                 self.audio = self.audio[:len(self.time)]
-            
-            # STFT analysis properties
+
             self.wind_size_samples = int(wind_size * self.fs)
             self.window = self.get_window(self.wind_size_samples)
             self.nfft_val = nfft
-            self.mid_point_idx = len(self.audio) // 2  # Start in middle
-            
-            # Initial plot
+            self.mid_point_idx = len(self.audio) // 2
+
             self.update_stft_plot(ax)
-            
-            # Set up interactions
-            self.span_selector = SpanSelector(
-                ax[0],
-                self.on_span_select,
-                'horizontal',
-                useblit=True,
-                interactive=True,
-                drag_from_anywhere=True
-            )
-            
+
+            # Use unified span selector
+            plot_id = id(self.current_figure.canvas.manager.window)
+            self.create_span_selector(ax[0], self.audio, plot_id)
+
             self.current_figure.canvas.mpl_connect(
-                'button_press_event', 
+                'button_press_event',
                 lambda e: self.on_window_click(e, ax)
             )
-            
-            self.show_plot_window(self.current_figure, ax[0], self.audio)            
+
+            self.show_plot_window(self.current_figure, ax[0], self.audio)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT plot failed: {str(e)}")
 
@@ -822,13 +786,6 @@ class ControlMenu(QDialog):
         # Update window center position
         self.mid_point_idx = np.searchsorted(self.time, event.xdata)
         self.update_stft_plot(ax)
-
-    def on_span_select(self, xmin, xmax):
-        """Handle span selection for playback (on drag)"""
-        start = np.searchsorted(self.time, xmin)
-        end = np.searchsorted(self.time, xmax)
-        segment = self.audio[start:end]
-        sd.play(segment, self.fs)
         
     def update_stft_plot(self, ax):
         """Update plot with proper array handling"""
@@ -1164,16 +1121,9 @@ class ControlMenu(QDialog):
             # Initial plot
             self.update_stft_spect_plot(ax1, ax2, ax3)
             
-            # Set up interactions
-            self.span_selector = SpanSelector(
-                ax1,
-                self.on_span_select,
-                'horizontal',
-                useblit=True,
-                interactive=True,
-                drag_from_anywhere=True
-            )
-            
+            plot_id = id(self.current_figure.canvas.manager.window)
+            self.create_span_selector(ax1, self.audio, plot_id)
+                        
             self.current_figure.canvas.mpl_connect(
                 'button_press_event', 
                 lambda e: self.on_window_click_spect(e, ax1, ax2, ax3)
@@ -1441,38 +1391,83 @@ class ControlMenu(QDialog):
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
+
     #similar to createSpanSelector just this takes the audio
     def create_span_selector(self, ax, audio_signal, plot_id):
         """Create a span selector for a specific axis within a plot window"""
+
         def onselect(xmin, xmax):
             self.stop_all_audio()
+
+            # Convert time to sample indices
             start_sample = int(xmin * self.fs)
             end_sample = int(xmax * self.fs)
-            segment = audio_signal[start_sample:end_sample]
-            
-            sd.stop()
-            sd.play(segment, self.fs)
 
-            # Remove any previous selection highlights
-            for patch in ax.patches:
-                if hasattr(patch, 'get_label') and patch.get_label() == 'selection':
-                    patch.remove()
+            # Safety check
+            if start_sample >= end_sample or end_sample > len(audio_signal):
+                print("Invalid selection range.")
+                return
+
+            segment = audio_signal[start_sample:end_sample].astype(np.float32)
+            self.stream_pos = 0
+            self.stream_data = segment
+            total_length = len(segment)
+
+            def callback(outdata, frames, time, status):
+                if status:
+                    print("Stream status:", status)
+
+                remaining = total_length - self.stream_pos
+                if remaining <= 0:
+                    raise sd.CallbackStop()
+
+                n_frames = min(frames, remaining)
+                chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
+
+                if n_frames < frames:
+                    chunk = np.pad(chunk, (0, frames - n_frames))
+
+                outdata[:, 0] = chunk
+                self.stream_pos += n_frames
+
+                if self.stream_pos >= total_length:
+                    raise sd.CallbackStop()
+
+            try:
+                self.active_stream = sd.OutputStream(
+                    samplerate=self.fs,
+                    channels=1,
+                    dtype='float32',
+                    callback=callback,
+                    blocksize=4096,
+                )
+                self.active_stream.start()
+            except Exception as e:
+                print("Error starting audio stream:", e)
+
+            # Visual: remove old span if any and draw new
+            try:
+                for patch in list(ax.patches):
+                    if hasattr(patch, 'get_label') and patch.get_label() == 'selection':
+                        patch.remove()
+            except Exception:
+                pass
+
             ax.axvspan(xmin, xmax, color='red', alpha=0.3, label='selection')
-            plt.gcf().canvas.draw()
+            ax.figure.canvas.draw_idle()
 
-        # Ensure list exists
+        # Ensure this plot ID has a selector list
         if plot_id not in self.span_selectors:
             self.span_selectors[plot_id] = []
 
-        # Remove any selector that already belongs to this axis
+        # Disconnect any existing selector on this axis
         for existing_selector in self.span_selectors[plot_id]:
-            if hasattr(existing_selector, 'ax') and existing_selector.ax == ax:
+            if getattr(existing_selector, 'ax', None) == ax:
                 try:
                     existing_selector.disconnect_events()
                 except Exception:
                     pass
 
-        # Create and store new selector
         selector = SpanSelector(
             ax,
             onselect,
@@ -1481,10 +1476,11 @@ class ControlMenu(QDialog):
             interactive=True,
             drag_from_anywhere=True
         )
-
-        # Manually store axis reference (since Matplotlib's selector doesn't expose it cleanly)
         selector.ax = ax
         self.span_selectors[plot_id].append(selector)
+
+
+
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms with optional pitch curves."""
