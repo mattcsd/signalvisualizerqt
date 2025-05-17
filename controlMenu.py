@@ -1443,9 +1443,8 @@ class ControlMenu(QDialog):
 
     #similar to createSpanSelector just this takes the audio
     def create_span_selector(self, ax, audio_signal, plot_id):
-        """Create a span selector for a specific plot window"""
+        """Create a span selector for a specific axis within a plot window"""
         def onselect(xmin, xmax):
-
             self.stop_all_audio()
             start_sample = int(xmin * self.fs)
             end_sample = int(xmax * self.fs)
@@ -1453,23 +1452,27 @@ class ControlMenu(QDialog):
             
             sd.stop()
             sd.play(segment, self.fs)
-            
-            # Visual feedback just for this plot
+
+            # Remove any previous selection highlights
             for patch in ax.patches:
                 if hasattr(patch, 'get_label') and patch.get_label() == 'selection':
                     patch.remove()
             ax.axvspan(xmin, xmax, color='red', alpha=0.3, label='selection')
             plt.gcf().canvas.draw()
-        
-        # Remove old selector if exists
-        if plot_id in self.span_selectors:
-            for selector in self.span_selectors[plot_id]:
+
+        # Ensure list exists
+        if plot_id not in self.span_selectors:
+            self.span_selectors[plot_id] = []
+
+        # Remove any selector that already belongs to this axis
+        for existing_selector in self.span_selectors[plot_id]:
+            if hasattr(existing_selector, 'ax') and existing_selector.ax == ax:
                 try:
-                    selector.disconnect_events()
-                except:
+                    existing_selector.disconnect_events()
+                except Exception:
                     pass
-        
-        # Create new selector
+
+        # Create and store new selector
         selector = SpanSelector(
             ax,
             onselect,
@@ -1478,10 +1481,9 @@ class ControlMenu(QDialog):
             interactive=True,
             drag_from_anywhere=True
         )
-        
-        # Store selector
-        if plot_id not in self.span_selectors:
-            self.span_selectors[plot_id] = []
+
+        # Manually store axis reference (since Matplotlib's selector doesn't expose it cleanly)
+        selector.ax = ax
         self.span_selectors[plot_id].append(selector)
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
@@ -1532,6 +1534,7 @@ class ControlMenu(QDialog):
 
             ax0.set(title='Original Signal Spectrogram')
             #not work
+            print(f"Creating span selector for ax0 (original) - plot_id={plot_id}")
             self.create_span_selector(ax0, self.audio, plot_id)
 
             if show_pitch:
@@ -1565,6 +1568,7 @@ class ControlMenu(QDialog):
 
             ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
             
+            print(f"Creating span selector for ax1 (filtered) - plot_id={plot_id}")
             self.create_span_selector(ax1, filtered_signal, plot_id)
 
             if show_pitch:
@@ -1584,8 +1588,10 @@ class ControlMenu(QDialog):
                 self.current_figure.colorbar(img1, cax=cbar_ax1, format="%+2.0f dB")
                 cbar_ax1.set_ylabel('Filtered Signal')
             '''
+
+            #first change
             self.current_figure.tight_layout()
-            self.show_plot_window(self.current_figure, ax1, self.audio)
+            self.show_plot_window(self.current_figure, None, None, create_selector=False)
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
@@ -1685,7 +1691,7 @@ class ControlMenu(QDialog):
         if hasattr(self, 'current_figure') and id(self.current_figure) == plot_id:
             del self.current_figure
 
-    def show_plot_window(self, figure, waveform_ax, audio_signal):
+    def show_plot_window(self, figure, waveform_ax=None, audio_signal=None, create_selector=True):
         """Show plot window with proper close handling"""
         method = self.method_selector.currentText()
         start, end = 0, self.duration
@@ -1695,7 +1701,7 @@ class ControlMenu(QDialog):
         plot_dialog.setWindowTitle(plot_title)
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
         plot_dialog.plot_id = id(plot_dialog)
-        
+
         # Store references
         plot_dialog.figure = figure
         plot_dialog.waveform_ax = waveform_ax
@@ -1708,15 +1714,18 @@ class ControlMenu(QDialog):
         layout.addWidget(canvas)
         plot_dialog.setLayout(layout)
 
-        # Connect close handler
         def handle_close():
             self.on_plot_window_close(plot_dialog.plot_id)
         plot_dialog.finished.connect(handle_close)
-        
-        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
+
+        # Only create selector if valid
+        if create_selector and waveform_ax is not None and audio_signal is not None:
+            self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
+
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
         return plot_dialog
+
 
     def on_plot_window_close(self, plot_id):
         """Handle plot window closure"""
