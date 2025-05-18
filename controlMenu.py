@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import ( QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
+from PyQt5.QtWidgets import ( QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
 from PyQt5.QtCore import Qt, QTimer
 import matplotlib.pyplot as plt
@@ -50,6 +50,7 @@ class ControlMenu(QDialog):
         self.audio_player = None
         self.is_playing = False
 
+
         np.seterr(divide='ignore')
         self.span = None
         self.setupUI()
@@ -95,56 +96,80 @@ class ControlMenu(QDialog):
         self.update_ui_state('Spectrogram')
 
     def play_from_current_position(self):
-        """Safe audio playback from cursor position"""
+        """Stream audio from the current position using a low-latency callback."""
 
-        import sounddevice as sd
-        
-        # Stop any existing playback
         self.stop_audio()
-    
+
         self.mid_point_idx = 0
         self.playback_start_sample = 0
 
-        # if i want to start 0 the line is here::!!
-        # Get current position
-        #start_sample = int(self.mid_point_idx)
-        audio_chunk = self.audio  # full track
+        # Use full audio
+        audio_chunk = self.audio
 
         if len(audio_chunk) == 0:
             print("Empty audio_chunk — skipping playback")
             return
-        
-        # Normalize audio
+
         if np.max(np.abs(audio_chunk)) > 1.0:
             audio_chunk = audio_chunk / np.max(np.abs(audio_chunk))
-        
 
-        # Validate audio shape and dtype
-        if self.audio.ndim > 1:
-            print(f"Converting multichannel audio with shape {self.audio.shape} to mono.")
+        if audio_chunk.ndim > 1:
+            print(f"Converting multichannel audio with shape {audio_chunk.shape} to mono.")
             audio_chunk = np.mean(audio_chunk, axis=1)
 
-        # Check for NaNs or silence
         if not np.any(audio_chunk):
             print("Audio chunk is silent or empty!")
             return
 
-        print(f"Audio length: {len(self.audio)}, sample rate: {self.fs}")
+        print(f"Audio length: {len(audio_chunk)}, sample rate: {self.fs}")
 
-        # Start playback
+        self.stream_pos = 0
+        self.stream_data = audio_chunk.astype(np.float32)
+        total_length = len(self.stream_data)
+
+        def callback(outdata, frames, time, status):
+            if status:
+                print("Stream status:", status)
+
+            remaining = total_length - self.stream_pos
+            if remaining <= 0:
+                raise sd.CallbackStop()
+
+            n_frames = min(frames, remaining)
+            chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
+
+            if n_frames < frames:
+                chunk = np.pad(chunk, (0, frames - n_frames))
+
+            outdata[:, 0] = chunk
+            self.stream_pos += n_frames
+            self.mid_point_idx = self.stream_pos  # <-- live cursor index for update_playback_position()
+
+            if self.stream_pos >= total_length:
+                raise sd.CallbackStop()
+
         try:
-            sd.play(audio_chunk, self.fs, blocking=False)
+            self.active_stream = sd.OutputStream(
+                samplerate=self.fs,
+                channels=1,
+                dtype='float32',
+                callback=callback,
+                blocksize=4096,
+            )
+            self.active_stream.start()
             self.is_playing = True
             self.playback_start_time = time.time()
-            self.playback_start_sample = start_sample
-            
-            # Start position updater
+            self.playback_start_sample = self.stream_pos
+
+            # Start visualization timer
             if not hasattr(self, 'playback_timer'):
                 self.playback_timer = QTimer()
                 self.playback_timer.timeout.connect(self.update_playback_position)
-            self.playback_timer.start(50)
+            self.playback_timer.start(5)
+
         except Exception as e:
             print(f"Audio playback failed: {e}")
+
 
     def show_help(self):
         """Properly shows and activates the help window"""
@@ -265,11 +290,13 @@ class ControlMenu(QDialog):
             sender.setText("▶ Start Live Analysis")
             self.stop_live_analysis()
 
+
     def start_live_analysis(self):
         """Start live analysis for STFT windows"""
         # Get the button that triggered this
         sender = self.sender()
-        
+        self.live_analysis_btn = sender
+
         # Find the parent plot dialog
         parent = sender.parent()
         while parent and not isinstance(parent, QDialog):
@@ -294,24 +321,40 @@ class ControlMenu(QDialog):
         self.live_timer.start(100)
 
     def update_playback_position(self):
-        """Update cursor position based on audio playback"""
-        if not hasattr(self, 'playback_start_time'):
+        # Use QMediaPlayer's position directly instead of time.time()
+        if not hasattr(self, 'media_player') or not self.media_player:
             return
-        
-        # Calculate current position
-        elapsed = time.time() - self.playback_start_time
-        self.mid_point_idx = min(len(self.audio) - 1, self.playback_start_sample + int(elapsed * self.fs))        
-        
 
-        # Update visualization
+        elapsed_ms = self.media_player.position()  # milliseconds
+        self.mid_point_idx = min(len(self.audio) - 1, int((elapsed_ms / 1000.0) * self.fs))
+
+        # Update waveform and STFT windows
         if hasattr(self, 'current_figure'):
-            ax1, ax2, ax3 = self.current_figure.axes[:3]
-            self.update_stft_spect_plot(ax1, ax2, ax3)
-        
-        # Check if reached end
+            try:
+                ax1, ax2, ax3 = self.current_figure.axes[:3]
+            except ValueError:
+                print("Expected 3 axes in current_figure, got something else")
+                return
+            
+            # Current window around the cursor
+            #check if not fixed
+            window_size = 1024
+            start_idx = max(0, self.mid_point_idx - window_size // 2)
+            end_idx = min(len(self.audio), start_idx + window_size)
+            segment = self.audio[start_idx:end_idx]
+
+            if len(segment) > 0:
+                self.update_stft_spect_plot(ax1, ax2, ax3, segment=segment)
+
+        # Check if playback has reached end
         if self.mid_point_idx >= len(self.audio):
             self.stop_audio_playback()
-            self.live_analysis_btn.setText("▶ Play Audio")
+            if hasattr(self, 'live_analysis_button'):
+                self.live_analysis_button.setText("▶ Play Audio")
+
+        print(f"Updating position: mid_point_idx = {self.mid_point_idx}")
+
+
 
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
@@ -1006,16 +1049,16 @@ class ControlMenu(QDialog):
     '''
 
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
-        """Create a specialized dialog for STFT plots with live analysis button"""
+        """Create a specialized dialog for STFT plots with live analysis button only"""
         plot_dialog = QDialog(self)
         plot_dialog.setWindowTitle("STFT Analysis")
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
         plot_dialog.plot_id = id(plot_dialog)
-        
+
         # Create main layout
         main_layout = QVBoxLayout()
-        
-        # Add live analysis button at the top (only for STFT windows)
+
+        # ▶ Live analysis button (as before)
         live_btn = QPushButton("▶ Start Live Analysis")
         live_btn.setCheckable(True)
         live_btn.setStyleSheet("""
@@ -1031,31 +1074,33 @@ class ControlMenu(QDialog):
         """)
         live_btn.clicked.connect(self.toggle_live_analysis)
         main_layout.addWidget(live_btn)
-        
-        # Add the figure canvas and toolbar
+
+        # Canvas and toolbar
         canvas = FigureCanvas(figure)
         toolbar = NavigationToolbar(canvas, plot_dialog)
         main_layout.addWidget(toolbar)
         main_layout.addWidget(canvas)
-        
+
+        # Set the final layout
         plot_dialog.setLayout(main_layout)
-        
+
         # Store references
         plot_dialog.figure = figure
         plot_dialog.waveform_ax = waveform_ax
         plot_dialog.live_analysis_btn = live_btn
-        
-        # Set up span selector
+
+        # Setup span selector (as before)
         self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
-        
-        # Connect close handler
+
+        # Handle window close and cleanup
         plot_dialog.destroyed.connect(lambda: self.cleanup_plot_window(plot_dialog.plot_id))
-        
-        # Add to windows list
+
+        # Track open windows
         self.plot_windows.append(plot_dialog)
-        
+
         plot_dialog.show()
         return plot_dialog
+
 
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
@@ -1157,9 +1202,12 @@ class ControlMenu(QDialog):
         self.mid_point_idx = np.searchsorted(self.time, event.xdata)
         self.update_stft_spect_plot(ax1, ax2, ax3)
 
-    def update_stft_spect_plot(self, ax1, ax2, ax3):
+    def update_stft_spect_plot(self, ax1, ax2, ax3, segment=None):
         """Update plot with proper array handling"""
         # Clear only the plots we need to update (not the spectrogram)
+        if segment is None:
+            segment = self.audio  # fallback to full audio
+
         ax1.clear()
         ax2.clear()
 
