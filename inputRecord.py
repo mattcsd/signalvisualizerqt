@@ -6,7 +6,7 @@ import soundfile as sf
 import sounddevice as sd
 from scipy.io.wavfile import write
 from pathlib import Path
-from PyQt5.QtWidgets import (QApplication, QWidget, QDialog, QLabel, QPushButton, 
+from PyQt5.QtWidgets import (QSpinBox, QApplication, QWidget, QDialog, QLabel, QPushButton, 
                             QVBoxLayout, QHBoxLayout, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont  # Added import
@@ -49,6 +49,20 @@ class Record(QWidget):  # Changed from QDialog to QWidget
         self.stop_button.clicked.connect(self.stop_recording)
         self.stop_button.setEnabled(False)
         
+        # Max record time control
+        time_limit_layout = QHBoxLayout()
+        time_limit_label = QLabel("Max record time (s):")
+        self.time_spinbox = QSpinBox()
+        self.time_spinbox.setRange(1, 600)  # 1 to 600 seconds
+        self.time_spinbox.setValue(30)      # Default to 30 seconds
+        self.time_spinbox.setSuffix(" s")
+
+        time_limit_layout.addWidget(time_limit_label)
+        time_limit_layout.addWidget(self.time_spinbox)
+        time_limit_layout.addStretch()
+
+        main_layout.addLayout(time_limit_layout)
+
         self.help_button = QPushButton("🛈")
         self.help_button.setFixedWidth(40)
         self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(7))
@@ -99,8 +113,9 @@ class Record(QWidget):  # Changed from QDialog to QWidget
         self.recording_start_time = time.time()
         
         self.timer.start(200)
-        self.auto_stop_timer.start(30_000)  # ⏱ Auto-stop after 30 seconds
-        
+        self.max_record_time = self.time_spinbox.value()
+        self.auto_stop_timer.start(self.max_record_time * 1000)
+                
         self.recording_thread = threading.Thread(target=self.record_audio)
         self.recording_thread.start()
         

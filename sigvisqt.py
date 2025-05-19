@@ -15,6 +15,7 @@ from generateSawtoothWave import SawtoothWave
 from optionsSpectrogram import Spectrogram
 from pitchAdvancedSettings import AdvancedSettings
 from auxiliar import Auxiliar
+from simpletuner import AudioFFTVisualizer
 
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases
@@ -94,7 +95,7 @@ class Start(QMainWindow):
         elif page_name == 'Spectrogram':
             self.frames['Spectrogram'] = Spectrogram(self.container, self)
         elif page_name == 'Tuner':
-            self.frames['Tuner'] = Tuner(self.container, self)
+            self.frames['Tuner'] = AudioFFTVisualizer(self.container, self)
 
         # Show the frame
         self.show_frame(page_name)
