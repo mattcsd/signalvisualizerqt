@@ -92,14 +92,16 @@ class AudioFFTVisualizer(QWidget):
         control_panel = QWidget()
         control_layout = QHBoxLayout(control_panel)
 
-        # Add instrument selection dropdown
+        # Instrument dropdown setup
         self.instrument_label = QLabel("Instrument:")
         self.instrument_dropdown = QComboBox()
+        self.instrument_dropdown.addItem("-- Select Instrument --", None)  # Default empty option
         self.instrument_dropdown.addItems(self.instrument_frequencies.keys())
         self.instrument_dropdown.currentTextChanged.connect(self.update_instrument_markers)
 
+
         # Add reset button
-        self.reset_button = QPushButton("Reset")
+        self.reset_button = QPushButton("Reset Values")
         self.reset_button.clicked.connect(self.reset_values)
         
         # Device selection dropdown
@@ -171,42 +173,57 @@ class AudioFFTVisualizer(QWidget):
         self.freq_markers.clear()
         self.freq_labels.clear()
 
+        # Skip if no instrument selected or it's the placeholder
+        if not instrument_name or instrument_name == "-- Select Instrument --":
+            self.canvas.draw()
+            return
+
         # Get frequencies and labels for selected instrument
         frequencies = self.instrument_frequencies.get(instrument_name, [])
         labels = self.instrument_labels.get(instrument_name, [])
 
         # Create vertical lines and labels for each frequency
-        colors = ['#FF5733', '#33FF57', '#3357FF', '#F033FF', '#FF33F0', '#33FFF0']
-        y_positions = [-5, -15, -10, -20, -7, -17]  # Different vertical positions
+        colors = [
+                '#FF5733',  # Red-orange
+                '#33FF57',  # Green
+                '#3357FF',  # Blue
+                '#F033FF',  # Purple 
+                '#FFC733',  # Yellow-orange (new)
+                '#33FFF0'   # Cyan (new)
+        ]
+        
+        # Calculate dynamic vertical positions (higher on the plot)
+        num_notes = len(frequencies)
+        base_y = 25  # Starting y position (higher up)
+        y_step = 20   # Vertical spacing between labels
+        y_positions = [base_y - (i % 3) * y_step for i in range(num_notes)]
+        angle = 30
         
         for freq, label, color, y_pos in zip(frequencies, labels, colors, y_positions):
             # Add vertical line
             marker = self.ax_fft.axvline(x=freq, color=color, linestyle='--', alpha=0.7, linewidth=1.5)
             self.freq_markers.append(marker)
             
-            # Add text label with staggered y-position
+            # Add text label without box
             text = self.ax_fft.text(
-                freq, y_pos, f"{label}\n{freq:.1f}Hz", 
+                freq, y_pos, f"{label} ({freq:.1f}Hz)", 
                 color=color, 
                 ha='center', 
                 va='top',
-                fontsize=9,
-                bbox=dict(
-                    facecolor='white', 
-                    alpha=0.7, 
-                    edgecolor=color,
-                    boxstyle='round,pad=0.2'
-                )
+                fontsize=10,
+                alpha=0.9,
+                weight='bold',
+                rotation=angle,
+                rotation_mode='anchor'
             )
             self.freq_labels.append(text)
 
-        # Adjust ylim to accommodate all labels
+        # Adjust ylim to ensure labels are visible
         current_ylim = self.ax_fft.get_ylim()
-        self.ax_fft.set_ylim(min(current_ylim[0], -25), current_ylim[1])  # Extra space at bottom
+        self.ax_fft.set_ylim(current_ylim[0], current_ylim[1])  # Keep existing upper limit
         
         self.canvas.draw()
 
-    
     def populate_device_dropdown(self):
         """Populate the dropdown with available devices"""
         self.device_dropdown.clear()
@@ -236,16 +253,18 @@ class AudioFFTVisualizer(QWidget):
         self.ax_wave.set_title('Time Domain - Microphone Input')
         self.ax_wave.set_xlim(0, self.CHUNK)
         self.ax_wave.set_ylim(-1, 1)
-        self.ax_wave.set_xlabel('Samples')
         self.ax_wave.set_ylabel('Amplitude')
         self.ax_wave.grid(True)
         
-        # FFT plot with fixed Y-axis
-        self.x_fft = np.linspace(0, self.RATE/2, self.CHUNK//2)
-        self.line_fft, = self.ax_fft.semilogx(self.x_fft, np.zeros(self.CHUNK//2), 'r')
+        # FFT plot initialization
+        freqs = np.fft.rfftfreq(self.CHUNK, 1 / self.RATE)
+        self.line_fft, = self.ax_fft.semilogx(freqs, np.zeros_like(freqs), 'r')
+        
+        self.setup_log_ticks()
+
         self.ax_fft.set_title('Frequency Domain - FFT Analysis')
         self.ax_fft.set_xlim(*self.frequency_range)
-        self.ax_fft.set_ylim(-self.zoom_level, 0)  # Set initial zoom level
+        self.ax_fft.set_ylim(-self.zoom_level, 0)
         self.ax_fft.set_xlabel('Frequency (Hz)')
         self.ax_fft.set_ylabel('Magnitude (dB)')
         self.ax_fft.grid(True, which='both')
@@ -290,61 +309,106 @@ class AudioFFTVisualizer(QWidget):
             self.audio_data = np.frombuffer(in_data, dtype=np.int16) / 32768.0
         return (in_data, pyaudio.paContinue)
 
+    def setup_log_ticks(self):
+        """Helper function to configure log scale ticks"""
+        # Set manual tick positions at specific frequencies
+        tick_positions = []
+        tick_labels = []
+        
+        # Define our frequency steps
+        steps_under_100 = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+        steps_100_to_1000 = [
+            100, 125, 150, 175, 200, 250, 300, 350, 
+            400, 500, 600, 700, 800, 900, 1000
+        ]
+        steps_above_1000 = [1000, 1500, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+        
+        # Combine all steps
+        all_steps = steps_under_100 + steps_100_to_1000 + steps_above_1000
+        
+        # Create ticks and labels
+        for freq in all_steps:
+            if 20 <= freq <= 20000:  # Within our display range
+                tick_positions.append(freq)
+                if freq < 1000:
+                    tick_labels.append(f"{freq:.0f}")
+                else:
+                    if freq % 1000 == 0:
+                        tick_labels.append(f"{freq//1000}k")
+                    else:
+                        tick_labels.append(f"{freq/1000:.1f}k")
+        
+        # Set the ticks
+        self.ax_fft.set_xticks(tick_positions)
+        self.ax_fft.set_xticklabels(tick_labels, rotation=45, ha='right', rotation_mode='anchor')        
+        
+        # Configure minor ticks (more dense)
+        self.ax_fft.xaxis.set_minor_locator(plt.LogLocator(
+            base=10, 
+            subs=np.linspace(0.1, 1.0, 10)[1:-1]  # More minor ticks between majors
+        ))
+        self.ax_fft.minorticks_on()
+
+        # Adjust layout to prevent label cutoff
+        self.figure.tight_layout()
+        self.figure.subplots_adjust(bottom=0.15)  # Add more space at bottom
+    
+        
+        # Style adjustments
+        self.ax_fft.tick_params(axis='x', which='major', length=6, width=1)
+        self.ax_fft.tick_params(axis='x', which='minor', length=3, width=0.5)
+
+        #self.ax_fft.minorticks_on()
+
     def update_plot(self):
         """Update the plots with new audio data"""
         if not self.running or not hasattr(self, 'audio_data'):
             return
 
         # Apply zoom/gain to the raw audio data
-        zoom_factor = self.zoom_level / 60.0  # Normalize to 1.0 at default zoom (60)
+        zoom_factor = self.zoom_level / 60.0
         processed_audio = self.audio_data * zoom_factor
 
-        # Update waveform plot with processed audio
+        # Update waveform plot
         self.line_wave.set_ydata(processed_audio)
-        self.ax_wave.set_ylim(-1, 1)  # Keep fixed limits
+        self.ax_wave.set_ylim(-1, 1)
 
-        # Compute FFT with Hann window on processed audio
+        # Compute FFT with Hann window
         window = np.hanning(len(processed_audio))
         yf = fft(processed_audio * window)
-        
-        # Calculate magnitude 
-        mag_lin = np.abs(yf[:len(yf)//2 + 1])  # For rfft equivalent
-        mag_lin = 2 / self.CHUNK * mag_lin  # Scale appropriately
-        
-        # Convert to dB and apply vertical offset
-        offset_db = self.offset_slider.value()
-        mag_db = 20 * np.log10(mag_lin + 1e-8) + offset_db
+        mag_lin = 2 / self.CHUNK * np.abs(yf[:len(yf)//2 + 1])
+        mag_db = 20 * np.log10(mag_lin + 1e-8) + self.offset_slider.value()
 
         # Update FFT line data
         freqs = np.fft.rfftfreq(self.CHUNK, 1 / self.RATE)
-        
-        # Ensure both arrays have the same length
         min_length = min(len(freqs), len(mag_db))
-        freqs = freqs[:min_length]
-        mag_db = mag_db[:min_length]
-        
-        self.line_fft.set_data(freqs, mag_db)
+        self.line_fft.set_data(freqs[:min_length], mag_db[:min_length])
 
-        # Update frequency scale based on checkbox
+        # Handle scale type
         if self.log_freq_checkbox.isChecked():
             self.ax_fft.set_xscale("linear")
             self.ax_fft.set_xlim(0, self.RATE / 2)
+            self.ax_fft.xaxis.set_major_formatter(plt.ScalarFormatter())
+            self.ax_fft.xaxis.set_major_locator(plt.MaxNLocator(10))
         else:
             self.ax_fft.set_xscale("log")
-            self.ax_fft.set_xlim(20, self.RATE / 2)
+            self.setup_log_ticks()  # Reapply our custom log ticks
+                    
+        # Remove any zero lines (including red line)
+        for line in self.ax_fft.lines:
+            if len(line.get_ydata()) > 0 and np.all(line.get_ydata() == 0):
+                line.remove()
 
-        # Keep fixed Y-axis limits for FFT (adjusted for possible offset)
+        # Adjust y-limits
         max_offset = self.offset_slider.maximum()
         self.ax_fft.set_ylim(-60 - max_offset, 0 + max_offset)
 
-        # Redraw canvas
         self.canvas.draw()
 
     def update_zoom_level(self, value):
         """Update the zoom/gain level (1.0 = normal)"""
         self.zoom_level = value
         self.update_plot()  # Trigger full update to see changes
-
 
     def closeEvent(self, event):
         """Handle window close event"""
@@ -354,3 +418,6 @@ class AudioFFTVisualizer(QWidget):
             self.stream.close()
         self.p.terminate()
         event.accept()
+
+
+
