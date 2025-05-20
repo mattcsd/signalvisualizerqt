@@ -3,7 +3,7 @@ import pyaudio
 from scipy.fft import fft
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
+from PyQt5.QtWidgets import (QCheckBox,QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
                             QHBoxLayout, QSizePolicy)
 from PyQt5.QtCore import QTimer, Qt
 import matplotlib.pyplot as plt
@@ -98,6 +98,18 @@ class AudioFFTVisualizer(QWidget):
         self.ymax_slider.setRange(10, 50)  # 0.1 to 5.0 in steps of 0.1
         self.ymax_slider.setValue(10)  # Default 1.0
         self.ymax_slider.valueChanged.connect(self.update_qt_ymax)
+
+        # Create checkbox for log/linear frequency scale
+        self.log_freq_checkbox = QCheckBox("Log Frequency Axis")
+        self.log_freq_checkbox.setChecked(False)  # Default to linear
+
+        # Optional: connect it to trigger redraw when toggled
+        self.log_freq_checkbox.stateChanged.connect(self.update_plot)
+
+        # Add it to your layout (adjust for your layout variable)
+        control_layout.addWidget(self.log_freq_checkbox)
+
+
         
         # Add widgets to control panel
         control_layout.addWidget(self.device_label)
@@ -274,24 +286,29 @@ class AudioFFTVisualizer(QWidget):
         yf = fft(self.audio_data * window)
         mag_lin = 2 / self.CHUNK * np.abs(yf[:self.CHUNK // 2])
 
-        # ── Apply user scaling (zoom) before log conversion ──────────
-        mag_lin_scaled = mag_lin * self.scale
+        # ── Convert to dB ───────────────────────────────────────────
+        mag_db = 20 * np.log10(mag_lin + 1e-8)
 
-        # ── Convert to dB ────────────────────────────────────────────
-        mag_db = 20 * np.log10(mag_lin_scaled + 1e-8)
-
-        # ── Update FFT data and plot ────────────────────────────────
-        self.fft_data = mag_db
+        # ── Update FFT line ─────────────────────────────────────────
         self.line_fft.set_ydata(mag_db)
 
-        # ── Fixed Y-axis range in dB ────────────────────────────────
-        self.ax_fft.set_ylim(-120, 0)
+        # ── Frequency axis setup ────────────────────────────────────
+        freqs = np.fft.rfftfreq(self.CHUNK, 1 / self.RATE)
+        self.line_fft.set_xdata(freqs)
+
+        if self.log_freq_checkbox.isChecked():
+            self.ax_fft.set_xscale("log")
+            self.ax_fft.set_xlim(20, self.RATE / 2)  # Avoid log(0)
+        else:
+            self.ax_fft.set_xscale("linear")
+            self.ax_fft.set_xlim(0, self.RATE / 2)
+
+        # ── Adjust y-axis dB range using slider ─────────────────────
+        zoom_db_range = self.zoom_slider.value()  # e.g. 60
+        self.ax_fft.set_ylim(-zoom_db_range, 0)
 
         # ── Redraw canvas ───────────────────────────────────────────
         self.canvas.draw()
-
-
-
 
     def closeEvent(self, event):
         """Handle window close event"""

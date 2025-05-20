@@ -136,9 +136,6 @@ class Start(QMainWindow):
         input_menu.addAction("Load", lambda: self.initialize_frame('Load'))
         input_menu.addAction("Record", lambda: self.initialize_frame('Record'))
 
-        # Options menu
-        options_menu = menubar.addMenu("Options")
-        options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
         tuner_menu = menubar.addMenu("Tuner")
         tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
@@ -146,6 +143,10 @@ class Start(QMainWindow):
 
         examples_menu = menubar.addMenu("Examples")
         examples_menu.addAction("Lute", lambda: self.initialize_frame('Lute'))
+        # Options menu
+        options_menu = menubar.addMenu("Options")
+        options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
+
 
     def launch_tuner(self):
         """Launch the live audio tuner"""
