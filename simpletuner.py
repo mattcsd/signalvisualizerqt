@@ -3,7 +3,7 @@ import pyaudio
 from scipy.fft import fft
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (QCheckBox,QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
+from PyQt5.QtWidgets import (QPushButton, QCheckBox, QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
                             QHBoxLayout, QSizePolicy)
 from PyQt5.QtCore import QTimer, Qt
 import matplotlib.pyplot as plt
@@ -26,11 +26,27 @@ class AudioFFTVisualizer(QWidget):
         self.current_device_index = None  # Will be set when starting stream
 
         # Visualization parameters
-        self.fft_max_scale = 1.0  # Initial fixed scale for FFT Y-axis
-        self.fft_min_scale = 0.0   # Minimum Y-axis value (fixed at 0)
+        self.zoom_level = 60  # Initial zoom level (dB range)
+        self.min_zoom = 20    # Minimum zoom level (more zoomed in)
+        self.max_zoom = 120   # Maximum zoom level (more zoomed out)
         
-        # List audio devices
-        #self.list_audio_devices()
+        # Instrument frequencies (in Hz)
+        self.instrument_frequencies = {
+            'Guitar (Standard)': [82.41, 110.00, 146.83, 196.00, 246.94, 329.63],  # E2, A2, D3, G3, B3, E4
+            'Violin': [196.00, 293.66, 440.00, 659.26],  # G3, D4, A4, E5
+            'Cretan Lute': [82.41, 110.00, 146.83, 196.00],  # E A D G
+            'Piano': [27.50, 55.00, 110.00, 220.00, 440.00, 880.00]  # A0-A5
+        }
+        
+        self.instrument_labels = {
+            'Guitar (Standard)': ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'],
+            'Violin': ['G3', 'D4', 'A4', 'E5'],
+            'Cretan Lute': ['E', 'A', 'D', 'G'],
+            'Piano': ['A0', 'A1', 'A2', 'A3', 'A4', 'A5']
+        }
+        
+        self.freq_markers = []  # To store reference line objects
+        self.freq_labels = []   # To store text label objects
 
         # Setup matplotlib figure and canvas
         self.setup_ui()
@@ -41,7 +57,6 @@ class AudioFFTVisualizer(QWidget):
         # Data buffers
         self.audio_data = np.zeros(self.CHUNK)
         self.fft_data = np.zeros(self.CHUNK//2)
-        self.scale = 1.0
         self.running = True
         
         # Timer for updates
@@ -76,6 +91,16 @@ class AudioFFTVisualizer(QWidget):
         # Create control panel with Qt widgets
         control_panel = QWidget()
         control_layout = QHBoxLayout(control_panel)
+
+        # Add instrument selection dropdown
+        self.instrument_label = QLabel("Instrument:")
+        self.instrument_dropdown = QComboBox()
+        self.instrument_dropdown.addItems(self.instrument_frequencies.keys())
+        self.instrument_dropdown.currentTextChanged.connect(self.update_instrument_markers)
+
+        # Add reset button
+        self.reset_button = QPushButton("Reset")
+        self.reset_button.clicked.connect(self.reset_values)
         
         # Device selection dropdown
         self.device_label = QLabel("Input Device:")
@@ -83,41 +108,40 @@ class AudioFFTVisualizer(QWidget):
         self.populate_device_dropdown()
         self.device_dropdown.currentIndexChanged.connect(self.change_device)
         
-        # Scale controls
-        self.scale_label = QLabel("FFT Scale:")
-        self.scale_slider = QSlider()
-        self.scale_slider.setOrientation(Qt.Horizontal)
-        self.scale_slider.setRange(10, 50)  # 0.1 to 5.0 in steps of 0.1
-        self.scale_slider.setValue(10)  # Default 1.0
-        self.scale_slider.valueChanged.connect(self.update_qt_scale)
-        
-        # Y-axis max controls
-        self.ymax_label = QLabel("Y-axis Max:")
-        self.ymax_slider = QSlider()
-        self.ymax_slider.setOrientation(Qt.Horizontal)
-        self.ymax_slider.setRange(10, 50)  # 0.1 to 5.0 in steps of 0.1
-        self.ymax_slider.setValue(10)  # Default 1.0
-        self.ymax_slider.valueChanged.connect(self.update_qt_ymax)
+        # Gain slider
+        self.zoom_label = QLabel("Gain:")
+        self.zoom_slider = QSlider()
+        self.zoom_slider.setOrientation(Qt.Horizontal)
+        self.zoom_slider.setRange(10, 120)  # 10=very amplified, 120=very attenuated
+        self.zoom_slider.setValue(60)       # Default neutral position
+        self.zoom_slider.valueChanged.connect(self.update_zoom_level)
 
-        # Create checkbox for log/linear frequency scale
-        self.log_freq_checkbox = QCheckBox("Log Frequency Axis")
-        self.log_freq_checkbox.setChecked(False)  # Default to linear
+        # Offset slider
+        self.offset_label = QLabel("Vertical Offset:")
+        self.offset_slider = QSlider()
+        self.offset_slider.setOrientation(Qt.Horizontal)
+        self.offset_slider.setRange(-40, 40)  # -40dB to +40dB offset range
+        self.offset_slider.setValue(0)        # Default no offset
+        self.offset_slider.valueChanged.connect(self.update_plot)
 
-        # Optional: connect it to trigger redraw when toggled
+
+        # Log/linear frequency scale checkbox
+        self.log_freq_checkbox = QCheckBox("Linear Frequency")
+        self.log_freq_checkbox.setChecked(False)
         self.log_freq_checkbox.stateChanged.connect(self.update_plot)
-
-        # Add it to your layout (adjust for your layout variable)
-        control_layout.addWidget(self.log_freq_checkbox)
-
-
         
         # Add widgets to control panel
         control_layout.addWidget(self.device_label)
         control_layout.addWidget(self.device_dropdown)
-        control_layout.addWidget(self.scale_label)
-        control_layout.addWidget(self.scale_slider)
-        control_layout.addWidget(self.ymax_label)
-        control_layout.addWidget(self.ymax_slider)
+        control_layout.addWidget(self.zoom_label)
+        control_layout.addWidget(self.zoom_slider)
+        control_layout.addWidget(self.offset_label)
+        control_layout.addWidget(self.offset_slider)
+        control_layout.addWidget(self.log_freq_checkbox)
+
+        control_layout.addWidget(self.instrument_label)
+        control_layout.addWidget(self.instrument_dropdown)
+        control_layout.addWidget(self.reset_button)
         
         # Add stretch to push controls left
         control_layout.addStretch()
@@ -130,6 +154,59 @@ class AudioFFTVisualizer(QWidget):
         # Setup plots
         self.setup_plots()
 
+    def reset_values(self):
+        """Reset all controls to default values"""
+        self.zoom_slider.setValue(60)
+        self.offset_slider.setValue(0)
+        self.log_freq_checkbox.setChecked(False)
+        self.update_plot()
+
+    def update_instrument_markers(self, instrument_name):
+        """Update the frequency reference lines based on selected instrument"""
+        # Clear existing markers and labels
+        for marker in self.freq_markers:
+            marker.remove()
+        for label in self.freq_labels:
+            label.remove()
+        self.freq_markers.clear()
+        self.freq_labels.clear()
+
+        # Get frequencies and labels for selected instrument
+        frequencies = self.instrument_frequencies.get(instrument_name, [])
+        labels = self.instrument_labels.get(instrument_name, [])
+
+        # Create vertical lines and labels for each frequency
+        colors = ['#FF5733', '#33FF57', '#3357FF', '#F033FF', '#FF33F0', '#33FFF0']
+        y_positions = [-5, -15, -10, -20, -7, -17]  # Different vertical positions
+        
+        for freq, label, color, y_pos in zip(frequencies, labels, colors, y_positions):
+            # Add vertical line
+            marker = self.ax_fft.axvline(x=freq, color=color, linestyle='--', alpha=0.7, linewidth=1.5)
+            self.freq_markers.append(marker)
+            
+            # Add text label with staggered y-position
+            text = self.ax_fft.text(
+                freq, y_pos, f"{label}\n{freq:.1f}Hz", 
+                color=color, 
+                ha='center', 
+                va='top',
+                fontsize=9,
+                bbox=dict(
+                    facecolor='white', 
+                    alpha=0.7, 
+                    edgecolor=color,
+                    boxstyle='round,pad=0.2'
+                )
+            )
+            self.freq_labels.append(text)
+
+        # Adjust ylim to accommodate all labels
+        current_ylim = self.ax_fft.get_ylim()
+        self.ax_fft.set_ylim(min(current_ylim[0], -25), current_ylim[1])  # Extra space at bottom
+        
+        self.canvas.draw()
+
+    
     def populate_device_dropdown(self):
         """Populate the dropdown with available devices"""
         self.device_dropdown.clear()
@@ -168,73 +245,22 @@ class AudioFFTVisualizer(QWidget):
         self.line_fft, = self.ax_fft.semilogx(self.x_fft, np.zeros(self.CHUNK//2), 'r')
         self.ax_fft.set_title('Frequency Domain - FFT Analysis')
         self.ax_fft.set_xlim(*self.frequency_range)
-        self.ax_fft.set_ylim(self.fft_min_scale, self.fft_max_scale)
+        self.ax_fft.set_ylim(-self.zoom_level, 0)  # Set initial zoom level
         self.ax_fft.set_xlabel('Frequency (Hz)')
-        self.ax_fft.set_ylabel('Magnitude')
+        self.ax_fft.set_ylabel('Magnitude (dB)')
         self.ax_fft.grid(True, which='both')
 
-    def add_controls(self):
-        """Add UI controls to the plot"""
-        axcolor = 'lightgoldenrodyellow'
-        
-        # FFT Scale slider (controls the data scaling)
-        self.ax_scale = self.figure.add_axes([0.2, 0.1, 0.6, 0.03], facecolor=axcolor)
-        self.scale_slider = widgets.Slider(
-            self.ax_scale, 'Data Scale', 0.1, 5.0, valinit=1.0, valstep=0.1
-        )
-        self.scale_slider.on_changed(self.update_scale)
-        
-        # Y-axis Max slider (controls the fixed Y-axis limit)
-        self.ax_ymax = self.figure.add_axes([0.2, 0.06, 0.6, 0.03], facecolor=axcolor)
-        self.ymax_slider = widgets.Slider(
-            self.ax_ymax, 'Y-axis Max', 0.1, 5.0, valinit=self.fft_max_scale, valstep=0.1
-        )
-        self.ymax_slider.on_changed(self.update_ymax)
-        
-        # Device selection dropdown
-        self.ax_device = self.figure.add_axes([0.2, 0.02, 0.6, 0.03], facecolor=axcolor)
-        
-        # Create device labels for dropdown
-        device_labels = [f"{dev['index']}: {dev['name']} (Ch: {dev['channels']})" 
-                        for dev in self.input_devices]
-        
-        # Create dropdown (RadioButtons styled as dropdown)
-        self.device_selector = widgets.RadioButtons(
-            self.ax_device,
-            labels=device_labels,
-            active=0  # Default to first device
-        )
-        
-        # Set smaller font size if many devices
-        if len(device_labels) > 3:
-            for label in self.device_selector.labels:
-                label.set_fontsize(8)
-        
-        self.device_selector.on_clicked(self.change_device)
+    def update_zoom_level(self, value):
+        """Update the zoom level (dB range) for the FFT plot"""
+        self.zoom_level = value
+        self.ax_fft.set_ylim(-self.zoom_level, 0)
+        self.canvas.draw()
 
     def change_device(self, index):
         """Handle device selection change"""
         device_index = self.device_dropdown.itemData(index)
         print(f"Selected device index: {device_index}")
         self.start_audio_stream(device_index)
-
-    def update_qt_scale(self, value):
-        """Update dB vertical shift from Qt slider"""
-        self.scale = value / 10.0  # Slider 10–50 → offset -20 dB to +80 dB
-
-
-    def update_qt_ymax(self, value):
-        """Update Y-axis max from Qt slider"""
-        self.fft_max_scale = value / 10.0  # Convert from 10-50 to 1.0-5.0
-        self.ax_fft.set_ylim(self.fft_min_scale, self.fft_max_scale)
-        self.canvas.draw()
-
-    def update_ymax(self, val):
-        """Update the fixed Y-axis maximum value"""
-        self.fft_max_scale = val
-        self.ax_fft.set_ylim(self.fft_min_scale, self.fft_max_scale)
-        self.canvas.draw()
-
 
     def start_audio_stream(self, device_index=None):
         """Start the audio input stream"""
@@ -264,51 +290,61 @@ class AudioFFTVisualizer(QWidget):
             self.audio_data = np.frombuffer(in_data, dtype=np.int16) / 32768.0
         return (in_data, pyaudio.paContinue)
 
-    def update_scale(self, val):
-        """Update the FFT scale factor"""
-        self.scale = val
-
-    def change_device(self, event):
-        """Change the audio input device"""
-        device_index = int(input("Enter device index: "))
-        self.start_audio_stream(device_index)
-
     def update_plot(self):
         """Update the plots with new audio data"""
         if not self.running or not hasattr(self, 'audio_data'):
             return
 
-        # ── Update waveform plot ─────────────────────────────────────
-        self.line_wave.set_ydata(self.audio_data)
+        # Apply zoom/gain to the raw audio data
+        zoom_factor = self.zoom_level / 60.0  # Normalize to 1.0 at default zoom (60)
+        processed_audio = self.audio_data * zoom_factor
 
-        # ── Compute FFT with Hann window ─────────────────────────────
-        window = np.hanning(len(self.audio_data))
-        yf = fft(self.audio_data * window)
-        mag_lin = 2 / self.CHUNK * np.abs(yf[:self.CHUNK // 2])
+        # Update waveform plot with processed audio
+        self.line_wave.set_ydata(processed_audio)
+        self.ax_wave.set_ylim(-1, 1)  # Keep fixed limits
 
-        # ── Convert to dB ───────────────────────────────────────────
-        mag_db = 20 * np.log10(mag_lin + 1e-8)
+        # Compute FFT with Hann window on processed audio
+        window = np.hanning(len(processed_audio))
+        yf = fft(processed_audio * window)
+        
+        # Calculate magnitude 
+        mag_lin = np.abs(yf[:len(yf)//2 + 1])  # For rfft equivalent
+        mag_lin = 2 / self.CHUNK * mag_lin  # Scale appropriately
+        
+        # Convert to dB and apply vertical offset
+        offset_db = self.offset_slider.value()
+        mag_db = 20 * np.log10(mag_lin + 1e-8) + offset_db
 
-        # ── Update FFT line ─────────────────────────────────────────
-        self.line_fft.set_ydata(mag_db)
-
-        # ── Frequency axis setup ────────────────────────────────────
+        # Update FFT line data
         freqs = np.fft.rfftfreq(self.CHUNK, 1 / self.RATE)
-        self.line_fft.set_xdata(freqs)
+        
+        # Ensure both arrays have the same length
+        min_length = min(len(freqs), len(mag_db))
+        freqs = freqs[:min_length]
+        mag_db = mag_db[:min_length]
+        
+        self.line_fft.set_data(freqs, mag_db)
 
+        # Update frequency scale based on checkbox
         if self.log_freq_checkbox.isChecked():
-            self.ax_fft.set_xscale("log")
-            self.ax_fft.set_xlim(20, self.RATE / 2)  # Avoid log(0)
-        else:
             self.ax_fft.set_xscale("linear")
             self.ax_fft.set_xlim(0, self.RATE / 2)
+        else:
+            self.ax_fft.set_xscale("log")
+            self.ax_fft.set_xlim(20, self.RATE / 2)
 
-        # ── Adjust y-axis dB range using slider ─────────────────────
-        zoom_db_range = self.zoom_slider.value()  # e.g. 60
-        self.ax_fft.set_ylim(-zoom_db_range, 0)
+        # Keep fixed Y-axis limits for FFT (adjusted for possible offset)
+        max_offset = self.offset_slider.maximum()
+        self.ax_fft.set_ylim(-60 - max_offset, 0 + max_offset)
 
-        # ── Redraw canvas ───────────────────────────────────────────
+        # Redraw canvas
         self.canvas.draw()
+
+    def update_zoom_level(self, value):
+        """Update the zoom/gain level (1.0 = normal)"""
+        self.zoom_level = value
+        self.update_plot()  # Trigger full update to see changes
+
 
     def closeEvent(self, event):
         """Handle window close event"""
