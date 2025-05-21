@@ -1398,6 +1398,8 @@ class ControlMenu(QDialog):
         ax1.plot(self.time, self.audio)
         ax1.axvspan(ini, end, color='silver', alpha=0.5)
         ax1.set_ylabel("Amplitude")
+        ax1.set_xlim(self.time[0], self.time[-1])  # 👈 this is the fix
+
 
         # === PSD ===
         _, freqs = ax2.psd(audio_segment, NFFT=wind_size_samples, Fs=self.fs,
@@ -1415,6 +1417,7 @@ class ControlMenu(QDialog):
             img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
                                            sr=self.fs, hop_length=hop_size,
                                            fmin=min_freq, fmax=max_freq, ax=ax3)
+            ax3.set_ylim([min_freq, max_freq])
         else:
             S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
                                                n_fft=nfft, hop_length=hop_size,
