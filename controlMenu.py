@@ -863,6 +863,10 @@ class ControlMenu(QDialog):
 
         # Plotting with matched dimensions
         ax[0].plot(self.time, self.audio)
+
+        ax[0].set_xlim(self.time[0], self.time[-1])
+
+
         ax[0].axvspan(time_segment[0], time_segment[-1], 
                      color='lightblue', alpha=0.3)
         ax[0].axvline(self.time[self.mid_point_idx], color='red', ls='--')
