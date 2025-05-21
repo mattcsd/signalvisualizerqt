@@ -20,7 +20,8 @@ class BeatFrequencyVisualizer(QWidget):
         self.sample_rate = None
         self.time = None
         self.playback_lines = []
-        self.cursor_ax = None  # To store cursor axis reference
+        self.axes = []  # Store references to all axes
+        self.backgrounds = None  # Will store the complete figure background
         self.last_update_time = time.time()
         self.update_interval = 0.02  # 20ms for ~50fps
         
@@ -35,6 +36,7 @@ class BeatFrequencyVisualizer(QWidget):
         
         self.init_ui()
         self.load_fixed_audio_file()
+
 
     def init_ui(self):
         self.setWindowTitle("Beat Frequency Visualizer")
@@ -133,8 +135,9 @@ class BeatFrequencyVisualizer(QWidget):
             
         self.figure.clear()
         self.playback_lines = []
+        self.axes = []
         
-        # Create 3 subplots now (waveform, envelope, spectrogram)
+        # Create 3 subplots
         gs = self.figure.add_gridspec(3, 1, height_ratios=[1, 1, 2], hspace=0.6)
         
         # 1. Waveform plot
@@ -143,16 +146,18 @@ class BeatFrequencyVisualizer(QWidget):
         self.playback_lines.append(ax0.axvline(x=0, color='r', linewidth=1))
         ax0.set_title("Waveform")
         ax0.set_xlim(0, self.time[-1])
+        self.axes.append(ax0)
         
         # 2. Amplitude envelope plot
         ax1 = self.figure.add_subplot(gs[1], sharex=ax0)
         amplitude = np.abs(self.audio_data)
-        smooth_window = int(0.02 * self.sample_rate)  # 20ms smoothing
+        smooth_window = int(0.02 * self.sample_rate)
         amplitude_smooth = np.convolve(amplitude, np.ones(smooth_window)/smooth_window, mode='same')
         ax1.plot(self.time, amplitude_smooth, 'b-', linewidth=1)
         self.playback_lines.append(ax1.axvline(x=0, color='r', linewidth=1))
         ax1.set_title("Amplitude Envelope")
         ax1.set_ylabel("Amplitude")
+        self.axes.append(ax1)
         
         # 3. Spectrogram plot
         ax2 = self.figure.add_subplot(gs[2], sharex=ax0)
@@ -171,7 +176,7 @@ class BeatFrequencyVisualizer(QWidget):
             y_axis='linear',
             ax=ax2,
             cmap='viridis',
-            vmin=-60,  # Better color range
+            vmin=-60,
             vmax=0
         )
         ax2.set_ylim(0, self.max_freq_spin.value())
@@ -179,13 +184,41 @@ class BeatFrequencyVisualizer(QWidget):
         ax2.set_title("Spectrogram")
         ax2.set_ylabel("Frequency (Hz)")
         ax2.set_xlabel("Time (s)")
+        self.axes.append(ax2)
         
-        # Store the background for blitting
+        # Draw everything once
         self.canvas.draw()
+        
+        # Store the complete figure background for blitting
         self.background = self.canvas.copy_from_bbox(self.figure.bbox)
-        self.cursor_ax = ax2  # Store one axis reference for blitting
+
+    def update_playback_cursor(self, position):
+        current_time = position / 1000  # Convert ms to seconds
         
-        self.canvas.draw()
+        # Update cursor positions
+        for line in self.playback_lines:
+            line.set_xdata([current_time, current_time])
+        
+        # Efficient redraw using blitting
+        if hasattr(self, 'background'):
+            try:
+                # Restore the complete background
+                self.canvas.restore_region(self.background)
+                
+                # Redraw just the cursors
+                for line in self.playback_lines:
+                    line.axes.draw_artist(line)
+                
+                # Blit the updated regions
+                self.canvas.blit(self.figure.bbox)
+                self.canvas.flush_events()
+            except Exception as e:
+                print(f"Blitting error: {e}")
+                # Fallback to full redraw if blitting fails
+                self.canvas.draw()
+        else:
+            self.canvas.draw()
+
 
     def toggle_playback(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
@@ -202,23 +235,7 @@ class BeatFrequencyVisualizer(QWidget):
         self.play_btn.setText("Play")
         self.update_playback_cursor(0)
 
-    def update_playback_cursor(self, position):
-        current_time = position / 1000  # Convert ms to seconds
-        
-        # Update cursor positions
-        for line in self.playback_lines:
-            line.set_xdata([current_time, current_time])
-        
-        # Efficient redraw using blitting
-        if hasattr(self, 'background'):
-            try:
-                self.canvas.restore_region(self.background)
-                for line in self.playback_lines:
-                    self.cursor_ax.draw_artist(line)
-                self.canvas.blit(self.cursor_ax.bbox)
-                self.canvas.flush_events()
-            except:
-                # Fallback to full draw if blitting fails
-                self.canvas.draw_idle()
-        else:
-            self.canvas.draw_idle()
+   
+
+
+   
