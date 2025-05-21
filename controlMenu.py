@@ -18,6 +18,7 @@ from scipy.io.wavfile import write
 from help import Help
 from pathlib import Path
 import time
+import matplotlib.gridspec as gridspec
 
 
 class ControlMenu(QDialog):
@@ -778,6 +779,7 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, max(freqs)], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+
     def plot_stft(self):
         """STFT with proper array dimension handling"""
         try:
@@ -858,8 +860,6 @@ class ControlMenu(QDialog):
             windowed = np.pad(windowed, (0, self.nfft_val - len(windowed)))
         stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
         freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
-        
-
 
         # Plotting with matched dimensions
         ax[0].plot(self.time, self.audio)
@@ -960,6 +960,7 @@ class ControlMenu(QDialog):
         try:
             # Validate parameters and get calculated values
             params = self.validate_spectrogram_parameters()
+
             wind_size_samples = params['wind_size_samples']
             hop_size = params['hop_size']
             nfft = params['nfft']
@@ -991,8 +992,10 @@ class ControlMenu(QDialog):
                                  win_length=wind_size_samples, window=window)
                 S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
-                                               sr=self.fs, hop_length=hop_size,
-                                               fmin=min_freq, fmax=max_freq, ax=ax1)
+                                               sr=self.fs, hop_length=hop_size, ax=ax1)
+
+                # Manually set y-axis frequency range
+                ax1.set_ylim([min_freq, max_freq])
             else:
                 S = librosa.feature.melspectrogram(y=audio, sr=self.fs,
                                                    n_fft=nfft, hop_length=hop_size,
@@ -1144,7 +1147,9 @@ class ControlMenu(QDialog):
                 self.S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
                 self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='linear',
                                                 sr=self.fs, hop_length=self.hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax3)
+                                                ax=ax3)
+                # Manually set y-axis frequency range
+                ax3.set_ylim([min_freq, max_freq])
             else:
                 S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
                                                 n_fft=self.nfft_val, hop_length=self.hop_size,
@@ -1357,7 +1362,10 @@ class ControlMenu(QDialog):
         )
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-        
+            
+    import matplotlib.gridspec as gridspec
+
+
     def plot_spectral_centroid(self):
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
@@ -1365,58 +1373,75 @@ class ControlMenu(QDialog):
         min_freq = int(self.min_freq.text())
         max_freq = int(self.max_freq.text())
         draw_style = self.draw_style.currentIndex() + 1
-        
-        self.current_figure = plt.figure(figsize=(12,6))
-        ax1 = plt.subplot(311)
-        ax2 = plt.subplot(312)
-        ax3 = plt.subplot(313, sharex=ax1)
+
+        self.current_figure = plt.figure(figsize=(12, 6))
+        gs = gridspec.GridSpec(3, 2, width_ratios=[20, 1])
+
+        ax1 = self.current_figure.add_subplot(gs[0, 0])
+        ax2 = self.current_figure.add_subplot(gs[1, 0])
+        ax3 = self.current_figure.add_subplot(gs[2, 0])
+        cax = self.current_figure.add_subplot(gs[2, 1])  # colorbar
+
         self.current_figure.suptitle('Spectral Centroid')
-        
+
         wind_size_samples = int(wind_size * self.fs)
         hop_size = wind_size_samples - int(overlap * self.fs)
         window = self.get_window(wind_size_samples)
-        
+
         audio_segment, (ini, end) = self.get_middle_segment(wind_size_samples)
         audio_segment = audio_segment * window
-        
+
         spectral_centroid = self.calculate_sc(audio_segment)
         sc_value = f"{spectral_centroid:.2f}"
-        
+
+        # === Waveform ===
         ax1.plot(self.time, self.audio)
         ax1.axvspan(ini, end, color='silver', alpha=0.5)
-        
-        _, freqs = ax2.psd(audio_segment, NFFT=wind_size_samples, Fs=self.fs, 
-                          window=window, noverlap=int(overlap * self.fs))
+        ax1.set_ylabel("Amplitude")
+
+        # === PSD ===
+        _, freqs = ax2.psd(audio_segment, NFFT=wind_size_samples, Fs=self.fs,
+                           window=window, noverlap=int(overlap * self.fs))
         ax2.axvline(x=spectral_centroid, color='r')
-        ax2.set(xlim=[0, max(freqs)], title=f'Spectral Centroid: {sc_value} Hz')
-        
+        ax2.set_xlim([0, max(freqs)])
+        ax2.set_ylabel("Power")
+        ax2.set_title(f"Spectral Centroid: {sc_value} Hz")
+
+        # === Spectrogram ===
         if draw_style == 1:
-            D = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size, 
-                            win_length=wind_size_samples, window=window)
+            D = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size,
+                             win_length=wind_size_samples, window=window)
             S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
             img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
-                                        sr=self.fs, hop_length=hop_size, 
-                                        fmin=min_freq, fmax=max_freq, ax=ax3)
+                                           sr=self.fs, hop_length=hop_size,
+                                           fmin=min_freq, fmax=max_freq, ax=ax3)
         else:
-            S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs, 
-                                            n_fft=nfft, hop_length=hop_size,
-                                            win_length=wind_size_samples, 
-                                            window=window, fmin=min_freq, 
-                                            fmax=max_freq)
+            S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
+                                               n_fft=nfft, hop_length=hop_size,
+                                               win_length=wind_size_samples,
+                                               window=window, fmin=min_freq,
+                                               fmax=max_freq)
             S_db = librosa.power_to_db(S, ref=np.max)
             img = librosa.display.specshow(S_db, x_axis='time', y_axis='mel',
-                                        sr=self.fs, hop_length=hop_size,
-                                        fmin=min_freq, fmax=max_freq, ax=ax3)
-        
-        sc = librosa.feature.spectral_centroid(y=self.audio, sr=self.fs, 
-                                             n_fft=nfft, hop_length=hop_size,
-                                             win_length=wind_size_samples)
+                                           sr=self.fs, hop_length=hop_size,
+                                           fmin=min_freq, fmax=max_freq, ax=ax3)
+
+        # === Overlay spectral centroid on spectrogram ===
+        sc = librosa.feature.spectral_centroid(y=self.audio, sr=self.fs,
+                                               n_fft=nfft, hop_length=hop_size,
+                                               win_length=wind_size_samples)
         times = librosa.times_like(sc, sr=self.fs, hop_length=hop_size)
-        ax3.plot(times, sc.T, color='w')
-        
-        self.current_figure.colorbar(img, ax=ax3, format="%+2.0f dB")
-        
+        ax3.plot(times, sc[0], color='w', linewidth=1.5)
+        ax3.set_ylabel("Freq (Hz)")
+        ax3.set_xlabel("Time (s)")
+
+        self.current_figure.colorbar(img, cax=cax, format="%+2.0f dB")
+        plt.tight_layout(rect=[0, 0, 0.97, 0.95])  # leave space for title
+
         self.show_plot_window(self.current_figure, ax1, self.audio)
+
+
+
     def plot_filtered_waveform(self, filter_type, filtered_signal):
         """Plot original and filtered waveforms with proper span selectors"""
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
@@ -1561,6 +1586,8 @@ class ControlMenu(QDialog):
                 img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='linear',
                                                 sr=self.fs, hop_length=hop_size,
                                                 fmin=min_freq, fmax=max_freq, ax=ax0)
+                # Manually set y-axis frequency range
+                ax0.set_ylim([min_freq, max_freq])
             else:
                 S_orig = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
                                                         n_fft=nfft, hop_length=hop_size,
@@ -1596,7 +1623,10 @@ class ControlMenu(QDialog):
                 S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
                 img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='linear',
                                                 sr=self.fs, hop_length=hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax1)
+                                                ax=ax1)
+
+                # Manually set y-axis frequency range
+                ax1.set_ylim([min_freq, max_freq])
             else:
                 S_filt = librosa.feature.melspectrogram(y=filtered_signal, sr=self.fs,
                                                         n_fft=nfft, hop_length=hop_size,

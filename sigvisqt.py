@@ -16,6 +16,7 @@ from optionsSpectrogram import Spectrogram
 from pitchAdvancedSettings import AdvancedSettings
 from auxiliar import Auxiliar
 from simpletuner import AudioFFTVisualizer
+from examples import BeatFrequencyVisualizer
 
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases
@@ -96,8 +97,9 @@ class Start(QMainWindow):
             self.frames['Spectrogram'] = Spectrogram(self.container, self)
         elif page_name == 'Tuner':
             self.frames['Tuner'] = AudioFFTVisualizer(self.container, self)
-
-        # Show the frame
+        elif page_name == 'Beat':
+            self.frames['Beat'] = BeatFrequencyVisualizer(self.container, self)
+                # Show the frame
         self.show_frame(page_name)
 
     def show_frame(self, page_name):
@@ -142,7 +144,7 @@ class Start(QMainWindow):
 
 
         examples_menu = menubar.addMenu("Examples")
-        examples_menu.addAction("Lute", lambda: self.initialize_frame('Lute'))
+        examples_menu.addAction("Beat", lambda: self.initialize_frame('Beat'))
         # Options menu
         options_menu = menubar.addMenu("Options")
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
