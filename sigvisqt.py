@@ -75,6 +75,10 @@ class Start(QMainWindow):
 
     def initialize_frame(self, page_name):
         """Initialize and display a frame based on the page name."""
+        # Clean up existing frame if it exists
+        if page_name in self.frames and hasattr(self.frames[page_name], 'cleanup'):
+            self.frames[page_name].cleanup()
+        
         if page_name == 'SignalVisualizer':
             self.frames['SignalVisualizer'] = SignalVisualizer(self.container, self)
         elif page_name == 'Info':
@@ -105,10 +109,18 @@ class Start(QMainWindow):
     def show_frame(self, page_name):
         """Show the frame corresponding to the given page name."""
         if page_name in self.frames:
+            # Clean up current frame if it exists and has cleanup method
+            current_widget = self.layout.itemAt(0).widget() if self.layout.count() > 0 else None
+            if current_widget and hasattr(current_widget, 'cleanup'):
+                current_widget.cleanup()
+            
             # Remove the current widget from the layout
             for i in reversed(range(self.layout.count())):
-                self.layout.itemAt(i).widget().setParent(None)
-
+                widget = self.layout.itemAt(i).widget()
+                widget.setParent(None)
+                if hasattr(widget, 'cleanup'):  # Additional safety check
+                    widget.cleanup()
+            
             # Add the new frame to the layout
             self.layout.addWidget(self.frames[page_name])
             self.frames[page_name].setVisible(True)

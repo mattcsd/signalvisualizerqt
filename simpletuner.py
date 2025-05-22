@@ -360,6 +360,15 @@ class AudioFFTVisualizer(QWidget):
 
         #self.ax_fft.minorticks_on()
 
+
+    def cleanup(self):
+        self.running = False
+        if hasattr(self, 'stream'):
+            self.stream.stop_stream()
+            self.stream.close()
+        self.p.terminate()
+
+
     def update_plot(self):
         """Update the plots with new audio data"""
         if not self.running or not hasattr(self, 'audio_data'):

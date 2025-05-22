@@ -226,6 +226,14 @@ class BeatFrequencyVisualizer(QWidget):
             # Fallback to full redraw
             self.canvas.draw()
 
+
+    def cleanup(self):
+        self.media_player.stop()
+        self.media_player.setMedia(QMediaContent())  # Clear media
+        # Clear any other resources if needed
+
+
+
     def toggle_playback(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
             self.media_player.pause()
@@ -238,7 +246,7 @@ class BeatFrequencyVisualizer(QWidget):
             if self.first_playback:
                 self.plot_spectrogram()
                 self.first_playback = False
-                
+
             self.media_player.play()
             self.play_btn.setText("Pause")
 
