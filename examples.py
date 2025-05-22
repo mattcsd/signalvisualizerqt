@@ -24,6 +24,8 @@ class BeatFrequencyVisualizer(QWidget):
         self.backgrounds = None  # Will store the complete figure background
         self.last_update_time = time.time()
         self.update_interval = 0.02  # 20ms for ~50fps
+
+        self.first_playback = True  # Add this flag
         
         # Fixed file path
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -195,6 +197,10 @@ class BeatFrequencyVisualizer(QWidget):
     def update_playback_cursor(self, position):
         current_time = position / 1000  # Convert ms to seconds
         
+        # Check if we've reached the end (with a small buffer)
+        if position >= self.media_player.duration() - 100:  # 100ms buffer
+            self.play_btn.setText("Play")
+        
         # Update cursor positions
         for line in self.playback_lines:
             line.set_xdata([current_time, current_time])
@@ -220,9 +226,6 @@ class BeatFrequencyVisualizer(QWidget):
             # Fallback to full redraw
             self.canvas.draw()
 
-            
-
-
     def toggle_playback(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
             self.media_player.pause()
@@ -230,6 +233,12 @@ class BeatFrequencyVisualizer(QWidget):
         else:
             if self.media_player.position() >= self.media_player.duration() - 100:
                 self.media_player.setPosition(0)
+
+            # Check if it's the first playback
+            if self.first_playback:
+                self.plot_spectrogram()
+                self.first_playback = False
+                
             self.media_player.play()
             self.play_btn.setText("Pause")
 

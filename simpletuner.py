@@ -392,6 +392,7 @@ class AudioFFTVisualizer(QWidget):
             self.ax_fft.xaxis.set_major_locator(plt.MaxNLocator(10))
         else:
             self.ax_fft.set_xscale("log")
+            self.ax_fft.set_xlim(*self.frequency_range)  # Reset to original frequency range
             self.setup_log_ticks()  # Reapply our custom log ticks
                     
         # Remove any zero lines (including red line)
