@@ -171,7 +171,6 @@ class ControlMenu(QDialog):
         except Exception as e:
             print(f"Audio playback failed: {e}")
 
-
     def show_help(self):
         """Properly shows and activates the help window"""
         if hasattr(self.controller, 'help'):
@@ -290,7 +289,6 @@ class ControlMenu(QDialog):
             # Button was toggled OFF
             sender.setText("▶ Start Live Analysis")
             self.stop_live_analysis()
-
 
     def start_live_analysis(self):
         """Start live analysis for STFT windows"""

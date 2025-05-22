@@ -1,10 +1,5 @@
 beat examples
-	call replot once start playing and is good 
-	when i exit the page stop audio
-	change button to play when you have reached the end
-	cant change page if audio plays?
 	if i play it many time it gets laggy, how can we keep it clean
-
 	write the text for the explanation of beat frequency
 
 sigvis.py
@@ -18,10 +13,10 @@ spectral centroid
 
 tuner & beat example ->because they get replotted alot, the zoom breaks , is there any way to pass the zoom parameter on to the next frame repaint??
 
-
-
 recordings
 	in the harmonics wav maybe we can locate the eigen of the other recording and explain how the instruments impulse response gives "character" to the sound produced by it.
+
+	tried to
 
 spectrogram
 	in span play why is the minimum ~15ms>
@@ -44,9 +39,6 @@ SOS
 
 	filtering_ waveforms 
 		plays the audio twice again. only the unfiltered!
-
-	filtering_spectro
-		show_pitch on the filtered also
 
 
 i got this error when i tried to press filter response:

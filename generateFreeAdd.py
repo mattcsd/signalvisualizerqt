@@ -48,7 +48,7 @@ class FreeAdditionPureTones(QDialog):
         # Default values
         self.default_values = [
             'Free addition of pure tones',
-            'duration', '1.0',
+            'duration', '0.3',
             'octave', '4',
             'freq1', '440', 'freq2', '880', 'freq3', '1320',
             'freq4', '1760', 'freq5', '2200', 'freq6', '2640',
@@ -87,7 +87,10 @@ class FreeAdditionPureTones(QDialog):
             control_layout.addWidget(QLabel(f"Frq{i+1}"), 0, i*2)
             sb = QSpinBox()
             sb.setRange(0, 24000)
-            sb.setValue(float(self.default_values[6+i*2]))
+
+            int_dval = int(self.default_values[6+i*2])
+            sb.setValue(int_dval)
+
             sb.setMaximumWidth(80)
             self.freq_spinboxes.append(sb)
             control_layout.addWidget(sb, 1, i*2)
