@@ -1,0 +1,1538 @@
+beat examples
+	call replot once start playing and is good 
+	when i exit the page stop audio
+	change button to play when you have reached the end
+	cant change page if audio plays?
+	if i play it many time it gets laggy, how can we keep it clean
+
+	write the text for the explanation of beat frequency
+
+sigvis.py
+	clear frames logic(when a tuner or example is change delete that frame)?
+
+tuner 
+	if i click the checkbox theredraw is fucked up
+
+spectral centroid
+	cannot move the window.
+
+tuner & beat example ->because they get replotted alot, the zoom breaks , is there any way to pass the zoom parameter on to the next frame repaint??
+
+
+
+recordings
+	in the harmonics wav maybe we can locate the eigen of the other recording and explain how the instruments impulse response gives "character" to the sound produced by it.
+
+spectrogram
+	in span play why is the minimum ~15ms>
+	can i not zoom in to both simutalneousny
+	maybe give more space vertically to the waveform
+
+SOS
+
+	stft_plot
+		if played many times the audio gets a little bad. meaning that playes half once then playes the whole thing again
+
+	stft+spectro
+		if i select the out of bounds it get blank. have solved before.
+		add blit fash gia ton cursora
+		add show_pitch
+
+	pitch same problem
+		i am able to select out of boundary and makes the redraw bad
+		add cursor
+
+	filtering_ waveforms 
+		plays the audio twice again. only the unfiltered!
+
+	filtering_spectro
+		show_pitch on the filtered also
+
+
+i got this error when i tried to press filter response:
+
+
+	Creating span selector for ax0 (original) - plot_id=5240815008
+Creating span selector for ax1 (filtered) - plot_id=5240815008
+Creating span selector for ax0 (original) - plot_id=5243053856
+Creating span selector for ax1 (filtered) - plot_id=5243053856
+Creating span selector for ax0 (original) - plot_id=5255368864
+Creating span selector for ax1 (filtered) - plot_id=5255368864
+Creating span selector for ax0 (original) - plot_id=5244418480
+Creating span selector for ax1 (filtered) - plot_id=5244418480
+Creating span selector for ax0 (original) - plot_id=5245936432
+Creating span selector for ax1 (filtered) - plot_id=5245936432
+Creating span selector for ax0 (original) - plot_id=5247389136
+Creating span selector for ax1 (filtered) - plot_id=5247389136
+QCoreApplication::exec: The event loop is already running
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2923, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(tools.Cursors.WAIT)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 380, in draw
+    with (self.toolbar._wait_cursor_for_draw_cm() if self.toolbar
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          else nullcontext()):
+          ^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2926, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(self._last_cursor)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2923, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(tools.Cursors.WAIT)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 380, in draw
+    with (self.toolbar._wait_cursor_for_draw_cm() if self.toolbar
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          else nullcontext()):
+          ^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2926, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(self._last_cursor)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2923, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(tools.Cursors.WAIT)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 380, in draw
+    with (self.toolbar._wait_cursor_for_draw_cm() if self.toolbar
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          else nullcontext()):
+          ^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2926, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(self._last_cursor)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 385, in draw
+    super().draw()
+    ~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 477, in draw
+    self.update()
+    ~~~~~~~~~~~^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2923, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(tools.Cursors.WAIT)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 380, in draw
+    with (self.toolbar._wait_cursor_for_draw_cm() if self.toolbar
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          else nullcontext()):
+          ^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2926, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(self._last_cursor)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 385, in draw
+    super().draw()
+    ~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 477, in draw
+    self.update()
+    ~~~~~~~~~~~^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2923, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(tools.Cursors.WAIT)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 380, in draw
+    with (self.toolbar._wait_cursor_for_draw_cm() if self.toolbar
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          else nullcontext()):
+          ^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.3/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2926, in _wait_cursor_for_draw_cm
+    self.canvas.set_cursor(self._last_cursor)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 269, in set_cursor
+    self.setCursor(_api.check_getitem(cursord, cursor=cursor))
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/widgets.py", line 2166, in update_background
+    self.canvas.draw()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_agg.py", line 385, in draw
+    super().draw()
+    ~~~~~~~~~~~~^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 477, in draw
+    self.update()
+    ~~~~~~~~~~~^^
+RuntimeError: wrapped C/C++ object of type FigureCanvasQTAgg has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+Traceback (most recent call last):
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/cbook.py", line 361, in process
+    func(*args, **kwargs)
+    ~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backend_bases.py", line 2954, in mouse_move
+    self.set_message(self._mouse_event_to_message(event))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kez542/Documents/code/Aholab/sig_vis_v2/testenvo/lib/python3.13/site-packages/matplotlib/backends/backend_qt.py", line 794, in set_message
+    self.locLabel.setText(s)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+RuntimeError: wrapped C/C++ object of type QLabel has been deleted
+
+
+
+
