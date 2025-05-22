@@ -91,27 +91,42 @@ class BeatFrequencyVisualizer(QWidget):
         playback_layout.addWidget(self.stop_btn)
         playback_group.setLayout(playback_layout)
         
-        # Visualization area
-        self.figure = Figure(figsize=(10, 7))  # Slightly taller for 3 plots
+        # Visualization area - modified to handle larger plots
+        self.figure = Figure(figsize=(12, 20))  # Increased figure size
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding) 
+
+
+        # Create container widget for canvas
+        plot_container = QWidget()
+        plot_layout = QVBoxLayout(plot_container)
+        plot_layout.addWidget(self.canvas)
+        plot_layout.setContentsMargins(0, 0, 0, 0)
+
+        # scroll area
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)  # Important!
+        self.scroll.setWidget(plot_container)
+        self.scroll.setMinimumHeight(500)  # Ensure scroll area has reasonable size
+
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
-        
-        # Educational content
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
+
+       # Educational content - in its own scroll area
+        edu_scroll = QScrollArea()
+        edu_scroll.setWidgetResizable(True)
         self.edu_content = QLabel()
         self.edu_content.setWordWrap(True)
         self.edu_content.setTextFormat(Qt.RichText)
-        scroll.setWidget(self.edu_content)
+        edu_scroll.setWidget(self.edu_content)
         
-        # Add widgets to main layout
+        # Add widgets to main layout with stretch factors
         main_layout.addWidget(param_group)
         main_layout.addWidget(playback_group)
         main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas, stretch=1)
-        main_layout.addWidget(scroll, stretch=1)
-        
+        main_layout.addWidget(self.scroll, stretch=1)  # This is now scrollable
+        #main_layout.addWidget(edu_scroll, stretch=1)
+        #main_layout.addWidget(plot_container)
+            
         self.setLayout(main_layout)
 
     def load_fixed_audio_file(self):
@@ -138,15 +153,16 @@ class BeatFrequencyVisualizer(QWidget):
         self.figure.clear()
         self.playback_lines = []
         
-        # Create 3 subplots
-        gs = self.figure.add_gridspec(3, 1, height_ratios=[1, 1, 2], hspace=0.6)
+        # Create 3 subplots with generous spacing
+        gs = self.figure.add_gridspec(3, 1, height_ratios=[5, 5, 8], hspace=0.6)
         
         # 1. Waveform plot
         ax0 = self.figure.add_subplot(gs[0])
         ax0.plot(self.time, self.audio_data, color='b', linewidth=0.5, alpha=0.7)
         self.playback_lines.append(ax0.axvline(x=0, color='r', linewidth=1, animated=True))
-        ax0.set_title("Waveform")
+        ax0.set_title("Waveform", pad=15, fontsize=10)
         ax0.set_xlim(0, self.time[-1])
+        ax0.tick_params(axis='both', labelsize=8)
         
         # 2. Amplitude envelope plot
         ax1 = self.figure.add_subplot(gs[1], sharex=ax0)
@@ -155,8 +171,9 @@ class BeatFrequencyVisualizer(QWidget):
         amplitude_smooth = np.convolve(amplitude, np.ones(smooth_window)/smooth_window, mode='same')
         ax1.plot(self.time, amplitude_smooth, 'b-', linewidth=1)
         self.playback_lines.append(ax1.axvline(x=0, color='r', linewidth=1, animated=True))
-        ax1.set_title("Amplitude Envelope")
-        ax1.set_ylabel("Amplitude")
+        ax1.set_title("Amplitude Envelope", pad=15, fontsize=10)
+        ax1.set_ylabel("Amplitude", fontsize=8)
+        ax1.tick_params(axis='both', labelsize=8)
         
         # 3. Spectrogram plot
         ax2 = self.figure.add_subplot(gs[2], sharex=ax0)
@@ -180,9 +197,22 @@ class BeatFrequencyVisualizer(QWidget):
         )
         ax2.set_ylim(0, self.max_freq_spin.value())
         self.playback_lines.append(ax2.axvline(x=0, color='r', linewidth=1, animated=True))
-        ax2.set_title("Spectrogram")
-        ax2.set_ylabel("Frequency (Hz)")
-        ax2.set_xlabel("Time (s)")
+        ax2.set_title("Spectrogram", pad=15, fontsize=10)
+        ax2.set_ylabel("Frequency (Hz)", fontsize=8)
+        ax2.set_xlabel("Time (s)", fontsize=8)
+        ax2.tick_params(axis='both', labelsize=8)
+        
+
+        # After plotting:
+        self.figure.tight_layout(pad=2.0, h_pad=1.0, w_pad=1.0)
+        self.canvas.draw()
+        
+        # Force update of scroll area
+        self.scroll.viewport().update()
+        
+
+        # Adjust layout
+        self.figure.tight_layout(pad=3.0)
         
         # Draw everything once
         self.canvas.draw()
