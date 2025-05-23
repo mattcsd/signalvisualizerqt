@@ -101,8 +101,8 @@ class Start(QMainWindow):
             self.frames['Spectrogram'] = Spectrogram(self.container, self)
         elif page_name == 'Tuner':
             self.frames['Tuner'] = AudioFFTVisualizer(self.container, self)
-        elif page_name == 'Beat':
-            self.frames['Beat'] = BeatFrequencyVisualizer(self.container, self)
+        elif page_name == 'Cretan Lute':
+            self.frames['Cretan Lute'] = BeatFrequencyVisualizer(self.container, self)
                 # Show the frame
         self.show_frame(page_name)
 
@@ -186,12 +186,12 @@ class Start(QMainWindow):
         tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
 
         examples_menu = menubar.addMenu("Examples")
-        examples_menu.addAction("Beat", lambda: self.initialize_frame('Beat'))
+        examples_menu.addAction("Cretan Lute", lambda: self.initialize_frame('Cretan Lute'))
 
         options_menu = menubar.addMenu("Options")
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
-        
+
 
     def launch_tuner(self):
         """Launch the live audio tuner"""

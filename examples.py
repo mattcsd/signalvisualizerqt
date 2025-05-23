@@ -6,7 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, Qt
-from PyQt5.QtWidgets import (QCheckBox, QWidget, QVBoxLayout, QLabel, QScrollArea, 
+from PyQt5.QtWidgets import (QComboBox, QCheckBox, QWidget, QVBoxLayout, QLabel, QScrollArea, 
                             QGroupBox, QPushButton, QMessageBox, 
                             QFormLayout, QSpinBox, QHBoxLayout,
                             QSizePolicy, QApplication)
@@ -34,9 +34,10 @@ class BeatFrequencyVisualizer(QWidget):
         self.fft_size = 4096 * 4  # 32768-point FFT for high resolution
         self.peak_markers = None  # Will be initialized in plot_spectrog
         
-        # Fixed file path
+        # Get recordings directory path
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.fixed_file_path = os.path.join(current_dir, "recordings", "beat.wav")
+        self.recordings_dir = os.path.join(current_dir, "recordings")
+        os.makedirs(self.recordings_dir, exist_ok=True)  # Create directory if it doesn't exist
         
         # Media player setup
         self.media_player = QMediaPlayer()
@@ -44,8 +45,8 @@ class BeatFrequencyVisualizer(QWidget):
         self.media_player.positionChanged.connect(self.update_playback_cursor)
         
         self.init_ui()
-        self.load_fixed_audio_file()
-
+        self.load_audio_files_list()  # Load available audio files
+        
     def init_ui(self):
         self.setWindowTitle("Beat Frequency Visualizer")
         self.setMinimumSize(1000, 800)
@@ -65,6 +66,11 @@ class BeatFrequencyVisualizer(QWidget):
         
         self.replot_btn = QPushButton("Replot")
         self.replot_btn.clicked.connect(self.plot_spectrogram)
+        
+        # File selection dropdown
+        self.file_combo = QComboBox()
+        self.file_combo.setMinimumWidth(200)
+        self.file_combo.currentIndexChanged.connect(self.on_file_selected)
         
         self.play_btn = QPushButton("Play")
         self.play_btn.clicked.connect(self.toggle_playback)
@@ -93,6 +99,8 @@ class BeatFrequencyVisualizer(QWidget):
         
         # Playback layout
         playback_layout = QHBoxLayout()
+        playback_layout.addWidget(QLabel("Select File:"))
+        playback_layout.addWidget(self.file_combo)
         playback_layout.addWidget(self.play_btn)
         playback_layout.addWidget(self.stop_btn)
         
@@ -252,20 +260,51 @@ class BeatFrequencyVisualizer(QWidget):
                 self.canvas.draw()
 
 
-    def load_fixed_audio_file(self):
+    def load_audio_files_list(self):
+        """Load all WAV files from the recordings directory into the dropdown"""
         try:
-            if os.path.exists(self.fixed_file_path):
-                self.audio_data, self.sample_rate = librosa.load(
-                    self.fixed_file_path, 
-                    sr=44100,
-                    mono=True
-                )
-                self.time = np.arange(len(self.audio_data)) / self.sample_rate
+            self.file_combo.clear()
+            files = [f for f in os.listdir(self.recordings_dir) if f.lower().endswith('.wav')]
+            
+            if not files:
+                self.file_combo.addItem("No WAV files found")
+                return
+            
+            for file in sorted(files):
+                self.file_combo.addItem(file)
+            
+            # Try to select beat.wav by default if it exists
+            beat_index = self.file_combo.findText("beat.wav")
+            if beat_index >= 0:
+                self.file_combo.setCurrentIndex(beat_index)
+            else:
+                self.on_file_selected(0)  # Load first file by default
                 
-                url = QUrl.fromLocalFile(self.fixed_file_path)
-                self.media_player.setMedia(QMediaContent(url))
-                
-                self.plot_spectrogram()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Could not list audio files: {str(e)}")
+
+    def on_file_selected(self, index):
+        """Handle when a new file is selected from the dropdown"""
+        if self.file_combo.count() == 0 or self.file_combo.currentText() == "No WAV files found":
+            return
+            
+        selected_file = self.file_combo.currentText()
+        file_path = os.path.join(self.recordings_dir, selected_file)
+        
+        try:
+            self.audio_data, self.sample_rate = librosa.load(
+                file_path, 
+                sr=44100,
+                mono=True
+            )
+            self.time = np.arange(len(self.audio_data)) / self.sample_rate
+            
+            url = QUrl.fromLocalFile(file_path)
+            self.media_player.setMedia(QMediaContent(url))
+            
+            self.plot_spectrogram()
+            self.first_playback = True  # Reset flag for new file
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load audio: {str(e)}")
 
