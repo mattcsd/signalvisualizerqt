@@ -14,6 +14,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.widgets import SpanSelector, Button
 from matplotlib.figure import Figure
 from controlMenu import ControlMenu
+from config import BASE_DIR, RECORDINGS_DIR, LIBRARY_DIR
 
 MAX_WINDOWS = 5 
 
@@ -74,7 +75,7 @@ class Load(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             "Open Audio File", 
-            str(library_dir),  # Set initial directory to library
+            str(LIBRARY_DIR),  # Set initial directory to library
             "WAV Files (*.wav);;All Files (*)"
         )
         

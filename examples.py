@@ -18,6 +18,7 @@ from scipy.signal.windows import blackmanharris
 # Add this import at the top
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl
+from config import BASE_DIR, RECORDINGS_DIR, LIBRARY_DIR
 
 class BeatFrequencyVisualizer(QWidget):
     def __init__(self, parent=None, controller=None):
@@ -38,10 +39,7 @@ class BeatFrequencyVisualizer(QWidget):
         self.fft_size = 4096 * 4  # 32768-point FFT for high resolution
         self.peak_markers = None  # Will be initialized in plot_spectrog
         
-        # Get recordings directory path
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.recordings_dir = os.path.join(current_dir, "recordings")
-        os.makedirs(self.recordings_dir, exist_ok=True)  # Create directory if it doesn't exist
+        self.recordings_dir = str(RECORDINGS_DIR)  # Convert Path object to string if needed
         
         # Media player setup
         self.media_player = QMediaPlayer()
@@ -347,7 +345,7 @@ class BeatFrequencyVisualizer(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load audio: {str(e)}")
 
-        
+
     def cleanup(self):
         self.media_player.stop()
         self.media_player.setMedia(QMediaContent())  # Clear media
