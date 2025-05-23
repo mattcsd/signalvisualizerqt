@@ -126,8 +126,40 @@ class Start(QMainWindow):
             self.frames[page_name].setVisible(True)
 
     def create_menu_bar(self):
-        """Create the menu bar for the application."""
+        """Create the menu bar for the application with improved styling."""
         menubar = self.menuBar()
+        
+        # Apply styling to make the menu bar more noticeable
+        menubar.setStyleSheet("""
+            QMenuBar {
+                background-color: #2c3e50;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QMenuBar::item {
+                background-color: transparent;
+                padding: 8px 15px;
+                border-radius: 4px;
+            }
+            QMenuBar::item:selected {
+                background-color: #3498db;
+            }
+            QMenuBar::item:pressed {
+                background-color: #2980b9;
+            }
+            QMenu {
+                background-color: #34495e;
+                color: white;
+                border: 1px solid #555;
+                font-size: 13px;
+                padding: 5px;
+            }
+            QMenu::item:selected {
+                background-color: #3498db;
+            }
+        """)
 
         # Signal Visualizer menu
         signal_menu = menubar.addMenu("Signal Visualizer")
@@ -150,17 +182,16 @@ class Start(QMainWindow):
         input_menu.addAction("Load", lambda: self.initialize_frame('Load'))
         input_menu.addAction("Record", lambda: self.initialize_frame('Record'))
 
-
         tuner_menu = menubar.addMenu("Tuner")
         tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
 
-
         examples_menu = menubar.addMenu("Examples")
         examples_menu.addAction("Beat", lambda: self.initialize_frame('Beat'))
-        # Options menu
+
         options_menu = menubar.addMenu("Options")
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
+        
 
     def launch_tuner(self):
         """Launch the live audio tuner"""

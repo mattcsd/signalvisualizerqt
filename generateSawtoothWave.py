@@ -21,7 +21,7 @@ class SawtoothWave(QWidget):
         self.master = master
         self.selectedAudio = np.empty(1)
         self.default_values = {
-            'duration': 1.0,
+            'duration': 0.3,
             'amplitude': 0.8,
             'fs': 44100,
             'offset': 0.0,
