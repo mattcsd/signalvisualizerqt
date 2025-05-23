@@ -1471,7 +1471,7 @@ class ControlMenu(QDialog):
         plot_id = id(self.current_figure.canvas.manager.window)
         
         # Create span selectors for both signals
-        self.create_span_selector(ax[0], self.audio, plot_id)  # Note: ax[0] not ax0
+        #self.create_span_selector(ax[0], self.audio, plot_id)  # Note: ax[0] not ax0
         self.create_span_selector(ax[1], filtered_signal, plot_id)  # Note: ax[1] not ax1
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)

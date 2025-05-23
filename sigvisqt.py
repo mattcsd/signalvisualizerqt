@@ -21,6 +21,7 @@ from examples import BeatFrequencyVisualizer
 import matplotlib.pyplot as plt
 from matplotlib import backend_bases
 from pitchAdvancedSettings import PitchAdvancedSettingsHandler
+from popupinfo import FirstRunDialog
 
 # To avoid blurry fonts on Windows
 if sys.platform == "win32":
@@ -36,13 +37,7 @@ class Start(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Signal Visualizer")
-        self.setWindowIcon(QIcon('icons/icon.ico'))
 
-        
-
-        self.icons = {
-            'icon': QIcon('icons/icon.ico')  # Make sure this path is correct
-        }
 
         # Set window size and center it
         self.resize(900, 650)  # Increased size to accommodate Info content
@@ -59,12 +54,17 @@ class Start(QMainWindow):
         
         # Initialize and show Info frame by default
         self.initialize_frame('Info')
+        self.show_welcome_dialog()
 
         # Initialize Help and AdvancedSettings
         self.help = Help(self.container, self)
         self.adse = PitchAdvancedSettingsHandler(parent=self)
         # Set up the menu bar
         self.create_menu_bar()
+
+    def show_welcome_dialog(self):
+        dialog = FirstRunDialog(self)
+        dialog.exec_()
 
     def center_window(self):
         """Center the window on the screen."""
