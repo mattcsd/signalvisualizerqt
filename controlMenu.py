@@ -349,6 +349,7 @@ class ControlMenu(QDialog):
         # Check if playback has reached end
         if self.mid_point_idx >= len(self.audio):
             self.stop_audio_playback()
+            self.stop_live_analysis()  # Ensure everything shuts down
             if hasattr(self, 'live_analysis_button'):
                 self.live_analysis_button.setText("▶ Play Audio")
 
@@ -356,37 +357,35 @@ class ControlMenu(QDialog):
 
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
+        self.stop_audio_playback()  # Ensure previous playback is stopped
 
         self.mid_point_idx = 0
-        self.playback_start_sample = 0
-        # Calculate start position
         start_sample = int(self.mid_point_idx)
         audio_segment = self.audio[start_sample:]
-        
-        # Normalize if needed
+
         if np.max(np.abs(audio_segment)) > 1.0:
             audio_segment = audio_segment / np.max(np.abs(audio_segment))
-        
-        # Start playback
-        sd.stop()  # Stop any existing playback
-        self.audio_player = sd.play(audio_segment, self.fs, blocking=False)
-        self.is_playing_audio = True
-        
-        # Store playback info
+
+        self.is_playing = True
         self.playback_start_time = time.time()
         self.playback_start_sample = start_sample
-        
-        # Start position updater if needed
+
+        import sounddevice as sd
+        sd.stop()
+        self.current_stream = sd.play(audio_segment, self.fs, blocking=False)
+
         if not hasattr(self, 'playback_timer'):
             self.playback_timer = QTimer()
             self.playback_timer.timeout.connect(self.update_playback_position)
-        self.playback_timer.start(16)  # Update every 50ms
+        self.playback_timer.start(30)  # ~30 FPS
+
 
     def stop_audio_playback(self):
         """Stop any ongoing audio playback"""
         import sounddevice as sd
         sd.stop()
         self.is_playing_audio = False
+        self.current_stream = None
         if hasattr(self, 'playback_timer'):
             self.playback_timer.stop()
 
@@ -415,21 +414,16 @@ class ControlMenu(QDialog):
 
     def stop_live_analysis(self):
         """Stop live analysis for STFT windows"""
-        # Stop audio first
-        self.stop_audio()
-        
-        # Stop timer if it exists
+        self.stop_audio_playback()  # Ensure audio stops
+
         if hasattr(self, 'live_timer'):
-            try:
-                self.live_timer.stop()
-            except:
-                pass
-        
-        # Update all STFT window buttons
+            self.live_timer.stop()
+
         for window in self.plot_windows:
             if hasattr(window, 'live_analysis_btn'):
                 window.live_analysis_btn.setChecked(False)
                 window.live_analysis_btn.setText("▶ Start Live Analysis")
+
 
     def stop_audio(self):
         """Stop all audio playback"""
@@ -1121,7 +1115,7 @@ class ControlMenu(QDialog):
         live_btn.setCheckable(True)
         live_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f0f0f0;
+                background-color: #ccffcc;
                 border: 1px solid #ccc;
                 padding: 5px;
                 margin: 5px;
@@ -1892,6 +1886,10 @@ class ControlMenu(QDialog):
         
         # Clear the list
         self.plot_windows.clear()
+
+        # Stop all playback and timers if window is closed
+        if hasattr(self.parent(), 'stop_audio_playback'):
+            self.parent().stop_audio_playback()
 
         if hasattr(self, 'live_analysis_timer'):
             self.live_analysis_timer.stop()
