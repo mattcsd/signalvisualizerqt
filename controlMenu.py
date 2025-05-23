@@ -353,8 +353,6 @@ class ControlMenu(QDialog):
 
         print(f"Updating position: mid_point_idx = {self.mid_point_idx}")
 
-
-
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
 
@@ -613,10 +611,10 @@ class ControlMenu(QDialog):
                                spectral_centroid_enabled or ste_enabled or show_filtering_spectrograms)
         self.nfft.setEnabled(stft_enabled or spectrogram_enabled or stft_spect_enabled or 
                             spectral_centroid_enabled or ste_enabled or show_filtering_spectrograms)
-        self.min_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or 
-                               spectral_centroid_enabled or show_filtering_spectrograms)
-        self.max_freq.setEnabled(spectrogram_enabled or stft_spect_enabled or 
-                               spectral_centroid_enabled or show_filtering_spectrograms)
+        self.min_freq.setEnabled(ft_enabled or stft_enabled or spectrogram_enabled or stft_spect_enabled or 
+                         spectral_centroid_enabled or show_filtering_spectrograms)
+        self.max_freq.setEnabled(ft_enabled or stft_enabled or spectrogram_enabled or stft_spect_enabled or 
+                                 spectral_centroid_enabled or show_filtering_spectrograms)
         self.draw_style.setEnabled(spectrogram_enabled or stft_spect_enabled or 
                                  spectral_centroid_enabled or filtering_enabled)
         self.show_pitch.setEnabled(
@@ -732,6 +730,19 @@ class ControlMenu(QDialog):
             plt.tight_layout()
             plt.show()
 
+    def get_freq_bounds(self):
+        try:
+            min_freq = float(self.min_freq.text())
+        except Exception:
+            min_freq = 0.0
+
+        try:
+            max_freq = float(self.max_freq.text())
+        except Exception:
+            max_freq = self.fs / 2
+
+        return min_freq, max_freq
+
     # [Rest of your methods remain unchanged...]
         # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
         # All other existing methods should be kept exactly as they were in the previous implementation
@@ -765,18 +776,21 @@ class ControlMenu(QDialog):
     def plot_ft(self):
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle('Fourier Transform')
-        
+
         fft = np.fft.fft(self.audio) / self.lenAudio
         fft = fft[range(int(self.lenAudio/2))]
         freqs = np.arange(int(self.lenAudio/2)) / (self.lenAudio/self.fs)
-        
+
         ax[0].plot(self.time, self.audio)
         ax[0].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
-        
+
+        min_freq, max_freq = self.get_freq_bounds()
         ax[1].plot(freqs, 20*np.log10(abs(fft)))
-        ax[1].set(xlim=[0, max(freqs)], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
-        
+        ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
+
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+
+    # STFT
 
     def plot_stft(self):
         """STFT with proper array dimension handling"""
@@ -801,8 +815,8 @@ class ControlMenu(QDialog):
             self.update_stft_plot(ax)
 
             # Use unified span selector
-            plot_id = id(self.current_figure.canvas.manager.window)
-            self.create_span_selector(ax[0], self.audio, plot_id)
+            #plot_id = id(self.current_figure.canvas.manager.window)
+            #self.create_span_selector(ax[0], self.audio, plot_id)
 
             self.current_figure.canvas.mpl_connect(
                 'button_press_event',
@@ -869,11 +883,14 @@ class ControlMenu(QDialog):
                      color='lightblue', alpha=0.3)
         ax[0].axvline(self.time[self.mid_point_idx], color='red', ls='--')
         
+        min_freq, max_freq = self.get_freq_bounds()
         ax[1].plot(freqs, 20*np.log10(stft + 1e-10))
-        ax[1].set(xlim=[0, self.fs/2], xlabel='Frequency (Hz)', 
+        ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', 
                  ylabel='Magnitude (dB)')
         
         self.current_figure.canvas.draw()
+
+    # Pitch
 
     def calculate_pitch(self, signal=None):
         """Calculate pitch using YIN algorithm with optional signal override."""
@@ -1025,33 +1042,6 @@ class ControlMenu(QDialog):
             self.show_plot_window(fig, ax0, audio)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
-    '''
-    def annotate_brightest_frequencies(self, ax, S_db, hop_length, nfft):
-        """Annotate the top 3 brightest frequencies at each time frame"""
-        # Find time points (every 0.5 seconds for cleaner display)
-        time_points = librosa.times_like(S_db, sr=self.fs, hop_length=hop_length)
-        step = max(1, int(0.5 * self.fs / hop_length))  # ~0.5 sec intervals
-        
-        for i in range(0, S_db.shape[1], step):
-            # Get the frame's magnitude data
-            frame = S_db[:, i]
-            
-            # Find top 3 brightest frequencies (least negative dB values)
-            brightest = np.argpartition(frame, -3)[-3:]
-            brightest = brightest[np.argsort(frame[brightest])][::-1]  # Sort descending
-            
-            for idx in brightest[:3]:  # Take top 3
-                if frame[idx] > -80:  # Only show if above noise floor
-                    freq = librosa.fft_frequencies(sr=self.fs, n_fft=nfft)[idx]
-                    ax.annotate(f'{freq:.0f} Hz',
-                               xy=(time_points[i], freq),
-                               xytext=(5, 5),
-                               textcoords='offset points',
-                               color='white',
-                               fontsize=8,
-                               bbox=dict(boxstyle='round,pad=0.2', 
-                                       fc='black', alpha=0.7))
-    '''
 
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
         """Create a specialized dialog for STFT plots with live analysis button only"""
@@ -1105,7 +1095,6 @@ class ControlMenu(QDialog):
 
         plot_dialog.show()
         return plot_dialog
-
 
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
@@ -1444,8 +1433,6 @@ class ControlMenu(QDialog):
         plt.tight_layout(rect=[0, 0, 0.97, 0.95])  # leave space for title
 
         self.show_plot_window(self.current_figure, ax1, self.audio)
-
-
 
     def plot_filtered_waveform(self, filter_type, filtered_signal):
         """Plot original and filtered waveforms with proper span selectors"""
