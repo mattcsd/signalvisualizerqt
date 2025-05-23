@@ -6,7 +6,7 @@ import time
 import matplotlib.pyplot as plt
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import QUrl, Qt
-from PyQt5.QtWidgets import (QComboBox, QCheckBox, QWidget, QVBoxLayout, QLabel, QScrollArea, 
+from PyQt5.QtWidgets import ( QTextBrowser, QComboBox, QCheckBox, QWidget, QVBoxLayout, QLabel, QScrollArea, 
                             QGroupBox, QPushButton, QMessageBox, 
                             QFormLayout, QSpinBox, QHBoxLayout,
                             QSizePolicy, QApplication)
@@ -14,6 +14,10 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from scipy.signal import find_peaks
 from scipy.signal.windows import blackmanharris 
+
+# Add this import at the top
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtCore import QUrl
 
 class BeatFrequencyVisualizer(QWidget):
     def __init__(self, parent=None, controller=None):
@@ -46,7 +50,7 @@ class BeatFrequencyVisualizer(QWidget):
         
         self.init_ui()
         self.load_audio_files_list()  # Load available audio files
-        
+
     def init_ui(self):
         self.setWindowTitle("Beat Frequency Visualizer")
         self.setMinimumSize(1000, 800)
@@ -96,6 +100,12 @@ class BeatFrequencyVisualizer(QWidget):
         param_layout.addWidget(QLabel("Hop Size:"))
         param_layout.addWidget(self.hop_size_spin)
         param_layout.addWidget(self.replot_btn)
+
+        # Add Help button
+        self.help_btn = QPushButton("Help")
+        self.help_btn.clicked.connect(self.show_help)
+        param_layout.addWidget(self.help_btn)
+
         
         # Playback layout
         playback_layout = QHBoxLayout()
@@ -121,6 +131,32 @@ class BeatFrequencyVisualizer(QWidget):
         main_layout.addWidget(self.canvas, stretch=1)
         
         self.setLayout(main_layout)
+
+    def show_help(self):
+        """Show help documentation for the current audio phenomenon"""
+        current_file = self.file_combo.currentText().lower()
+        
+        # Create HTML content based on the selected file
+        html_content = self.generate_help_content(current_file)
+        
+        # Create help window
+        self.help_window = QWidget()
+        self.help_window.setWindowTitle(f"Help: {current_file}")
+        self.help_window.resize(800, 600)
+        
+        layout = QVBoxLayout()
+        web_view = QWebEngineView()
+        
+        # Use a data URL to display our HTML content
+        web_view.setHtml(html_content, QUrl.fromLocalFile(''))
+        
+        layout.addWidget(web_view)
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.help_window.close)
+        layout.addWidget(close_btn)
+        
+        self.help_window.setLayout(layout)
+        self.help_window.show()
 
     def plot_spectrogram(self):
         if self.audio_data is None:
@@ -259,7 +295,6 @@ class BeatFrequencyVisualizer(QWidget):
                 # Fallback to full redraw if blitting fails
                 self.canvas.draw()
 
-
     def load_audio_files_list(self):
         """Load all WAV files from the recordings directory into the dropdown"""
         try:
@@ -292,6 +327,10 @@ class BeatFrequencyVisualizer(QWidget):
         file_path = os.path.join(self.recordings_dir, selected_file)
         
         try:
+            # Stop any current playback and reset button
+            self.media_player.stop()
+            self.play_btn.setText("Play")  # <-- Add this line
+            
             self.audio_data, self.sample_rate = librosa.load(
                 file_path, 
                 sr=44100,
@@ -308,13 +347,11 @@ class BeatFrequencyVisualizer(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load audio: {str(e)}")
 
-
+        
     def cleanup(self):
         self.media_player.stop()
         self.media_player.setMedia(QMediaContent())  # Clear media
         # Clear any other resources if needed
-
-
 
     def toggle_playback(self):
         if self.media_player.state() == QMediaPlayer.PlayingState:
@@ -337,6 +374,176 @@ class BeatFrequencyVisualizer(QWidget):
         self.play_btn.setText("Play")
         self.update_playback_cursor(0)
 
-   
+    def generate_help_content(self, filename):
+        """Generate HTML help content based on the audio file"""
+        filename_lower = filename.lower()
+        
+        if "beat" in filename_lower:
+            return """
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+                    h1 { color: #2c3e50; }
+                    img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
+                    .note { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; }
+                </style>
+            </head>
+            <body>
+                <h1>Beat Frequencies in Acoustics</h1>
+                
+                <p>Beat frequencies occur when two sound waves of slightly different frequencies interfere with each other.</p>
+                
+                <h2>What Musicians Should Know</h2>
+                
+                <p>When tuning instruments, beats are actually useful! Here's why:</p>
+                
+                <div class="note">
+                    <strong>Practical Tip:</strong> When tuning two strings to unison, listen for beats. 
+                    As the frequencies get closer, the beats slow down. When they completely disappear, 
+                    your strings are in perfect tune!
+                </div>
+                
+                <h3>The Science Behind Beats</h3>
+                
+                <p>Mathematically, when two waves with frequencies f₁ and f₂ combine, you hear:</p>
+                
+                <ul>
+                    <li>A <strong>carrier frequency</strong> at the average: (f₁ + f₂)/2</li>
+                    <li>A <strong>beat frequency</strong> at the difference: |f₁ - f₂|</li>
+                </ul>
+                
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Interference_of_two_waves.svg/1200px-Interference_of_two_waves.svg.png" 
+                     alt="Wave interference diagram" style="max-width: 500px;">
+                <p style="text-align: center;"><em>Constructive and destructive interference creates the beating effect</em></p>
+                
+                <h3>Musical Applications</h3>
+                
+                <ul>
+                    <li>Tuning instruments (especially strings and pipe organs)</li>
+                    <li>Creating special effects in electronic music</li>
+                    <li>Understanding how vibrato works</li>
+                </ul>
+                
+                <h3>Try This Experiment</h3>
+                
+                <p>In this visualization:</p>
+                <ol>
+                    <li>Look at the waveform - see the amplitude modulation?</li>
+                    <li>Check the spectrogram - can you spot the two close frequencies?</li>
+                    <li>Listen carefully - count how many beats occur per second</li>
+                </ol>
+            </body>
+            </html>
+            """
+        
+        elif "combo" in filename_lower:
+            return """
+            <html><body style="font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">Resonating Frequencies</h1>
+                <p>This demonstrates how open strings resonate when other strings are played.</p>
+                
+                <h2>What's Happening</h2>
+                <ul>
+                    <li>First pluck shows the fundamental frequency</li>
+                    <li>Subsequent plucks show sympathetic vibrations in other strings</li>
+                    <li>Particularly strong on strings that share harmonic relationships</li>
+                </ul>
+                
+                <h2>Musical Uses</h2>
+                <ul>
+                    <li><strong>Resonance:</strong> Harp and piano use this effect deliberately</li>
+                    <li><strong>Tuning:</strong> Helps verify proper string relationships</li>
+                    <li><strong>Composition:</strong> Used in spectral music compositions</li>
+                </ul>
+            </body></html>
+            """
+        
+        elif "harmonics" in filename_lower:
+            return """
+            <html><body style="font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">String Harmonics</h1>
+                <p>Harmonics are pure tones created by dividing the string at specific nodes.</p>
+                
+                <h2>Types Demonstrated</h2>
+                <ul>
+                    <li><strong>Natural harmonics:</strong> Created by lightly touching the string at fractional divisions</li>
+                    <li><strong>Artificial harmonics:</strong> Created by stopping the string and touching a node</li>
+                </ul>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db;">
+                    <strong>Did You Know?</strong> The harmonic at the 12th fret is exactly one octave above the open string.
+                </div>
+                
+                <h2>Practical Uses</h2>
+                <ul>
+                    <li>Tuning reference (harmonics are always perfectly in tune)</li>
+                    <li>Special effects in compositions</li>
+                    <li>Checking instrument intonation</li>
+                </ul>
+            </body></html>
+            """
+        
+        elif "eigen" in filename_lower:
+            return """
+            <html><body style="font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">Instrument Eigenvalues</h1>
+                <p>These are the natural resonant frequencies of your instrument's body.</p>
+                
+                <h2>What You're Hearing</h2>
+                <ul>
+                    <li>The "voice" of your instrument's wood and construction</li>
+                    <li>Peak resonance frequencies that amplify certain notes</li>
+                    <li>Characteristics that make each instrument unique</li>
+                </ul>
+                
+                <h2>Why It Matters</h2>
+                <ul>
+                    <li><strong>Luthiers:</strong> Use this to fine-tune instrument construction</li>
+                    <li><strong>Players:</strong> Helps identify an instrument's "sweet spots"</li>
+                    <li><strong>Recording:</strong> Knowing these helps with microphone placement</li>
+                </ul>
+            </body></html>
+            """
+        
+        elif "tapedelay" in filename_lower:
+            return """
+            <html><body style="font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">Analog Tape Delay Effects</h1>
+                <p>This demonstrates the warm, organic sound of analog delay circuits.</p>
+                
+                <h2>Characteristics</h2>
+                <ul>
+                    <li>High-frequency rolloff creates warmer repeats</li>
+                    <li>Slight modulation adds "wobble" to the sound</li>
+                    <li>Non-linear saturation creates musical distortion</li>
+                </ul>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db;">
+                    <strong>Pro Tip:</strong> Set delay time to match song tempo (60000/BPM = ms delay time)
+                </div>
+                
+                <h2>Musical Uses</h2>
+                <ul>
+                    <li><strong>Slapback:</strong> Short delays for rockabilly and blues</li>
+                    <li><strong>Ambience:</strong> Longer delays for atmospheric effects</li>
+                    <li><strong>Rhythm:</strong> Syncopated delays for reggae and dub</li>
+                </ul>
+            </body></html>
+            """
+        
+        else:
+            return """
+            <html><body style="font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #2c3e50;">Audio Analysis Help</h1>
+                <p>Use this visualizer to explore:</p>
+                <ul>
+                    <li><strong>Waveform:</strong> See the amplitude changes over time</li>
+                    <li><strong>Spectrogram:</strong> View frequency content evolution</li>
+                    <li><strong>FFT:</strong> Analyze harmonic content at any moment</li>
+                </ul>
+                <p>Try adjusting the analysis parameters to see different aspects of the sound.</p>
+            </body></html>
+            """
 
 
