@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import ( QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
+from PyQt5.QtWidgets import (QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
 from PyQt5.QtCore import Qt, QTimer
 import matplotlib.pyplot as plt
@@ -20,6 +20,7 @@ from pathlib import Path
 import time
 import matplotlib.gridspec as gridspec
 
+from matplotlib.widgets import SpanSelector
 
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
@@ -773,6 +774,8 @@ class ControlMenu(QDialog):
             if self.current_figure:
                 plt.close(self.current_figure)
 
+    # FT
+
     def plot_ft(self):
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle('Fourier Transform')
@@ -789,6 +792,7 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
 
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+
 
     # STFT
 
@@ -890,6 +894,7 @@ class ControlMenu(QDialog):
         
         self.current_figure.canvas.draw()
 
+
     # Pitch
 
     def calculate_pitch(self, signal=None):
@@ -932,6 +937,64 @@ class ControlMenu(QDialog):
             QMessageBox.warning(self, "Pitch Error", f"Could not calculate pitch: {str(e)}")
             dummy_length = len(signal) // 512 if signal is not None else 100
             return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
+
+    def plot_pitch(self):
+        method = self.pitch_method.currentText()
+        min_pitch = float(self.min_pitch.text())
+        max_pitch = float(self.max_pitch.text())
+        
+        self.current_figure, ax = plt.subplots(2, figsize=(12,6))
+        self.current_figure.suptitle('Pitch Contour')
+        
+        # No need to write to file - we can work directly with the audio array
+        audio = self.audio.astype(np.float32)  # Ensure correct dtype for librosa
+        
+        # Plot waveform
+        ax[0].plot(self.time, audio)
+        
+        # Calculate pitch using librosa
+        if method == 'Autocorrelation':
+            # Using librosa's yin algorithm (similar to autocorrelation)
+            pitch_values, voiced_flag, voiced_probs = librosa.pyin(
+                audio, 
+                fmin=min_pitch, 
+                fmax=max_pitch,
+                sr=self.fs
+            )
+        elif method == 'Cross-correlation':
+            # Using librosa's default pitch tracking (which uses STFT-based approach)
+            pitch_values = librosa.yin(
+                audio,
+                fmin=min_pitch,
+                fmax=max_pitch,
+                sr=self.fs
+            )
+        else:
+            # For other methods, you might need additional libraries
+            # For example, for subharmonics you could use crepe
+            raise NotImplementedError(f"Method {method} not implemented with librosa")
+        
+        # Create time array for pitch frames
+        hop_length = 512  # default for librosa
+        frame_time = librosa.frames_to_time(
+            np.arange(len(pitch_values)),
+            sr=self.fs,
+            hop_length=hop_length
+        )
+        
+        # Plot pitch contour
+        ax[1].plot(frame_time, pitch_values, '-')
+        ax[1].set(
+            xlim=[0, self.duration],
+            ylim=[min_pitch, max_pitch],
+            xlabel='Time (s)',
+            ylabel='Frequency (Hz)'
+        )
+        
+        self.show_plot_window(self.current_figure, ax[0], self.audio)
+
+
+    # Spectrogram
 
     def validate_spectrogram_parameters(self):
         """Validate spectrogram parameters and return calculated values"""
@@ -1096,6 +1159,8 @@ class ControlMenu(QDialog):
         plot_dialog.show()
         return plot_dialog
 
+    # STFT + Spectrogram
+
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
         try:
@@ -1104,6 +1169,10 @@ class ControlMenu(QDialog):
             nfft = int(self.nfft.currentText())
             min_freq = int(self.min_freq.text())
             max_freq = int(self.max_freq.text())
+            self.min_freq_val = min_freq
+            self.max_freq_val = max_freq
+
+
             draw_style = self.draw_style.currentIndex() + 1
             
             # Create figure with adjusted layout
@@ -1139,8 +1208,9 @@ class ControlMenu(QDialog):
                 self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='linear',
                                                 sr=self.fs, hop_length=self.hop_size,
                                                 ax=ax3)
-                # Manually set y-axis frequency range
+                # Manually set axis [y]frequency x[audio_duration] range
                 ax3.set_ylim([min_freq, max_freq])
+                ax3.set_xlim([0, len(self.audio) / self.fs])
             else:
                 S = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
                                                 n_fft=self.nfft_val, hop_length=self.hop_size,
@@ -1150,20 +1220,27 @@ class ControlMenu(QDialog):
                 self.S_db = librosa.power_to_db(S, ref=np.max)
                 self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='mel',
                                                 sr=self.fs, hop_length=self.hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax3)
-            
+                                                ax=ax3)
+                # Manually set axis [y]frequency x[audio_duration] range
+                ax3.set_ylim([min_freq, max_freq])
+                ax3.set_xlim([0, len(self.audio) / self.fs])
+
             # Make spectrogram labels more readable
             ax3.set_ylabel('Frequency (Hz)', fontsize=10)
             ax3.tick_params(axis='both', which='major', labelsize=8)
             
+            duration = len(self.audio) / self.fs
+            ax1.set_xlim([0, duration])
+            ax3.set_xlim([0, duration])
+
             # Create colorbar
             self.cbar = self.current_figure.colorbar(self.img, cax=cbar_ax, format="%+2.0f dB")
             
             # Initial plot
             self.update_stft_spect_plot(ax1, ax2, ax3)
             
-            plot_id = id(self.current_figure.canvas.manager.window)
-            self.create_span_selector(ax1, self.audio, plot_id)
+            #plot_id = id(self.current_figure.canvas.manager.window)
+            #self.create_span_selector(ax1, self.audio, plot_id)
                         
             self.current_figure.canvas.mpl_connect(
                 'button_press_event', 
@@ -1238,19 +1315,23 @@ class ControlMenu(QDialog):
         
         # Plot time domain with highlighted window
         ax1.plot(self.time, self.audio)
+        ax1.set_xlim([0, len(self.audio) / self.fs])
+
         ax1.axvspan(time_segment[0], time_segment[-1], color='lightblue', alpha=0.3)
         if self.mid_point_idx < len(self.time):
             ax1.axvline(self.time[self.mid_point_idx], color='red', ls='--')
                 
         # Plot STFT
         ax2.plot(freqs, 20*np.log10(stft + 1e-10))
-        ax2.set(xlim=[0, self.fs/2], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
-        
+        ax2.set(xlim=[self.min_freq_val, self.max_freq_val], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
+
         # Update the spectrogram image data instead of recreating it
         self.img.set_array(self.S_db)
         self.img.autoscale()
         
         self.current_figure.canvas.draw()
+
+    # Short Time Energy
 
     def plot_ste(self):
         wind_size = float(self.window_size.text())
@@ -1298,62 +1379,7 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-    
-    def plot_pitch(self):
-        method = self.pitch_method.currentText()
-        min_pitch = float(self.min_pitch.text())
-        max_pitch = float(self.max_pitch.text())
-        
-        self.current_figure, ax = plt.subplots(2, figsize=(12,6))
-        self.current_figure.suptitle('Pitch Contour')
-        
-        # No need to write to file - we can work directly with the audio array
-        audio = self.audio.astype(np.float32)  # Ensure correct dtype for librosa
-        
-        # Plot waveform
-        ax[0].plot(self.time, audio)
-        
-        # Calculate pitch using librosa
-        if method == 'Autocorrelation':
-            # Using librosa's yin algorithm (similar to autocorrelation)
-            pitch_values, voiced_flag, voiced_probs = librosa.pyin(
-                audio, 
-                fmin=min_pitch, 
-                fmax=max_pitch,
-                sr=self.fs
-            )
-        elif method == 'Cross-correlation':
-            # Using librosa's default pitch tracking (which uses STFT-based approach)
-            pitch_values = librosa.yin(
-                audio,
-                fmin=min_pitch,
-                fmax=max_pitch,
-                sr=self.fs
-            )
-        else:
-            # For other methods, you might need additional libraries
-            # For example, for subharmonics you could use crepe
-            raise NotImplementedError(f"Method {method} not implemented with librosa")
-        
-        # Create time array for pitch frames
-        hop_length = 512  # default for librosa
-        frame_time = librosa.frames_to_time(
-            np.arange(len(pitch_values)),
-            sr=self.fs,
-            hop_length=hop_length
-        )
-        
-        # Plot pitch contour
-        ax[1].plot(frame_time, pitch_values, '-')
-        ax[1].set(
-            xlim=[0, self.duration],
-            ylim=[min_pitch, max_pitch],
-            xlabel='Time (s)',
-            ylabel='Frequency (Hz)'
-        )
-        
-        self.show_plot_window(self.current_figure, ax[0], self.audio)
-            
+                
     import matplotlib.gridspec as gridspec
 
 
@@ -1470,7 +1496,13 @@ class ControlMenu(QDialog):
 
             # Safety check
             if start_sample >= end_sample or end_sample > len(audio_signal):
-                print("Invalid selection range.")
+                # Show popup error message
+                QMessageBox.warning(self, "Invalid Selection", "Please select a valid time range.")
+                
+                # Clear the selection line by redrawing it (resetting selection)
+                self.span_selector.visible = False
+                ax.figure.canvas.draw()
+                self.span_selector.visible = True
                 return
 
             segment = audio_signal[start_sample:end_sample].astype(np.float32)
