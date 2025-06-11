@@ -23,6 +23,9 @@ from matplotlib import backend_bases
 from pitchAdvancedSettings import PitchAdvancedSettingsHandler
 from popupinfo import FirstRunDialog
 
+from fundamentalSeparator import FundamentalHarmonicsSeparator
+
+
 # To avoid blurry fonts on Windows
 if sys.platform == "win32":
     from ctypes import windll
@@ -129,18 +132,19 @@ class Start(QMainWindow):
         """Create the menu bar for the application with improved styling."""
         menubar = self.menuBar()
         
-        # Apply styling to make the menu bar more noticeable
+        # Apply responsive styling to the menu bar
         menubar.setStyleSheet("""
             QMenuBar {
                 background-color: #2c3e50;
                 color: white;
-                font-size: 14px;
+                font-size: 1em;  /* Using em units for better scaling */
                 font-weight: bold;
-                padding: 5px;
+                padding: 0.5em;  /* Relative padding */
+                spacing: 0.5em;  /* Space between items */
             }
             QMenuBar::item {
                 background-color: transparent;
-                padding: 8px 15px;
+                padding: 0.5em 1em;  /* Relative padding */
                 border-radius: 4px;
             }
             QMenuBar::item:selected {
@@ -153,13 +157,24 @@ class Start(QMainWindow):
                 background-color: #34495e;
                 color: white;
                 border: 1px solid #555;
-                font-size: 13px;
-                padding: 5px;
+                font-size: 0.9em;  /* Slightly smaller than menu bar */
+                padding: 0.5em;
+                min-width: 8em;  /* Minimum width to prevent squishing */
+            }
+            QMenu::item {
+                padding: 0.3em 1.5em 0.3em 1em;  /* Top, right, bottom, left */
+                margin: 0.1em;
             }
             QMenu::item:selected {
                 background-color: #3498db;
             }
+            QMenu::separator {
+                height: 1px;
+                background: #555;
+                margin: 0.3em 0;
+            }
         """)
+
 
         # Signal Visualizer menu
         signal_menu = menubar.addMenu("Signal Visualizer")
@@ -184,6 +199,11 @@ class Start(QMainWindow):
 
         tuner_menu = menubar.addMenu("Tuner")
         tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
+        
+        # Add new menu item
+        tools_menu = menubar.addMenu("Tools")
+        tools_menu.addAction("Fundamental/Harmonics Separator", 
+                        lambda: self.show_separator_tool())
 
         examples_menu = menubar.addMenu("Examples")
         examples_menu.addAction("Cretan Lute", lambda: self.initialize_frame('Cretan Lute'))
@@ -191,7 +211,15 @@ class Start(QMainWindow):
         options_menu = menubar.addMenu("Options")
         options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
 
-
+    def show_separator_tool(self):
+        """Show the separator tool in a new window"""
+        if not hasattr(self, 'separator_window') or not self.separator_window.isVisible():
+            self.separator_window = FundamentalHarmonicsSeparator()
+            self.separator_window.show()
+            
+            # If you have audio loaded in the main window, pass it to the separator
+            if hasattr(self, 'current_audio') and self.current_audio is not None:
+                self.separator_window.load_signal(self.current_audio, self.current_fs)
 
     def launch_tuner(self):
         """Launch the live audio tuner"""

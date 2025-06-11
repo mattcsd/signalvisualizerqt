@@ -19,7 +19,7 @@ from help import Help
 from pathlib import Path
 import time
 import matplotlib.gridspec as gridspec
-
+import matplotlib.gridspec as gridspec
 from matplotlib.widgets import SpanSelector
 
 class ControlMenu(QDialog):
@@ -379,7 +379,6 @@ class ControlMenu(QDialog):
             self.playback_timer.timeout.connect(self.update_playback_position)
         self.playback_timer.start(30)  # ~30 FPS
 
-
     def stop_audio_playback(self):
         """Stop any ongoing audio playback"""
         import sounddevice as sd
@@ -424,7 +423,6 @@ class ControlMenu(QDialog):
                 window.live_analysis_btn.setChecked(False)
                 window.live_analysis_btn.setText("▶ Start Live Analysis")
 
-
     def stop_audio(self):
         """Stop all audio playback"""
         import sounddevice as sd
@@ -453,7 +451,7 @@ class ControlMenu(QDialog):
             # Safe visualization update
             ax1, ax2, ax3 = self.current_figure.axes[:3]
             self.update_stft_spect_plot(ax1, ax2, ax3)
-        except (AttributeError, RuntimeError) as e:
+        except (AttributeError, RuntimeEr,ror) as e:
             print(f"Visual update failed: {e}")
             self.stop_live_analysis()
         
@@ -738,10 +736,6 @@ class ControlMenu(QDialog):
 
         return min_freq, max_freq
 
-    # [Rest of your methods remain unchanged...]
-        # plot_figure(), plot_ft(), plot_stft(), plot_spectrogram(), etc.
-        # All other existing methods should be kept exactly as they were in the previous implementation
-
     def plot_figure(self):
         method = self.method_selector.currentText()
         
@@ -767,6 +761,7 @@ class ControlMenu(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to create plot: {str(e)}")
             if self.current_figure:
                 plt.close(self.current_figure)
+
 
     # FT
 
@@ -1153,6 +1148,7 @@ class ControlMenu(QDialog):
         plot_dialog.show()
         return plot_dialog
 
+
     # STFT + Spectrogram
 
     def plot_stft_spect(self):
@@ -1325,6 +1321,7 @@ class ControlMenu(QDialog):
         
         self.current_figure.canvas.draw()
 
+
     # Short Time Energy
 
     def plot_ste(self):
@@ -1373,9 +1370,9 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-                
-    import matplotlib.gridspec as gridspec
 
+
+    # Spectral Centroid
 
     def plot_spectral_centroid(self):
         wind_size = float(self.window_size.text())
@@ -1454,6 +1451,14 @@ class ControlMenu(QDialog):
 
         self.show_plot_window(self.current_figure, ax1, self.audio)
 
+    def calculate_sc(self, segment):
+        magnitudes = np.abs(np.fft.rfft(segment))
+        freqs = np.fft.rfftfreq(len(segment), 1/self.fs)
+        return np.sum(magnitudes * freqs) / np.sum(magnitudes)
+
+
+    # Filtered section.
+
     def plot_filtered_waveform(self, filter_type, filtered_signal):
         """Plot original and filtered waveforms with proper span selectors"""
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
@@ -1475,7 +1480,6 @@ class ControlMenu(QDialog):
         self.create_span_selector(ax[1], filtered_signal, plot_id)  # Note: ax[1] not ax1
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-
 
     #similar to createSpanSelector just this takes the audio
     def create_span_selector(self, ax, audio_signal, plot_id):
@@ -1569,9 +1573,6 @@ class ControlMenu(QDialog):
         )
         selector.ax = ax
         self.span_selectors[plot_id].append(selector)
-
-
-
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms with optional pitch curves."""
@@ -1690,7 +1691,6 @@ class ControlMenu(QDialog):
             if self.current_figure:
                 plt.close(self.current_figure)
 
-
     def plot_filtering(self):
         filter_type = self.filter_type.currentText()
         percentage = float(self.percentage.text())
@@ -1756,10 +1756,7 @@ class ControlMenu(QDialog):
         else:
             self.plot_filtered_spectrogram(filter_type, filtered_signal)
 
-    def calculate_sc(self, segment):
-        magnitudes = np.abs(np.fft.rfft(segment))
-        freqs = np.fft.rfftfreq(len(segment), 1/self.fs)
-        return np.sum(magnitudes * freqs) / np.sum(magnitudes)
+    # Plot methods
 
     def cleanup_plot_window(self, plot_id):
         """Clean up when any plot window closes"""
@@ -1817,7 +1814,6 @@ class ControlMenu(QDialog):
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
         return plot_dialog
-
 
     def on_plot_window_close(self, plot_id):
         """Handle plot window closure"""
