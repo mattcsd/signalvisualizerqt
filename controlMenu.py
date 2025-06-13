@@ -1092,17 +1092,29 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
+
+
+    
+
+    # STFT + Spectrogram
+
+
+
+
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
         """Create a specialized dialog for STFT plots with live analysis button only"""
         plot_dialog = QDialog(self)
         plot_dialog.setWindowTitle("STFT Analysis")
         plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
         plot_dialog.plot_id = id(plot_dialog)
+        
+        # Add this line to track audio streams
+        plot_dialog.active_stream = None  # <-- NEW LINE
 
         # Create main layout
         main_layout = QVBoxLayout()
 
-        # ▶ Live analysis button (as before)
+        # ▶ Live analysis button
         live_btn = QPushButton("▶ Start Live Analysis")
         live_btn.setCheckable(True)
         live_btn.setStyleSheet("""
@@ -1133,11 +1145,23 @@ class ControlMenu(QDialog):
         plot_dialog.waveform_ax = waveform_ax
         plot_dialog.live_analysis_btn = live_btn
 
-        # Setup span selector (as before)
-        self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
+        # Setup span selector - pass the dialog object itself
+        self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
 
-        # Handle window close and cleanup
-        plot_dialog.destroyed.connect(lambda: self.cleanup_plot_window(plot_dialog.plot_id))
+        # Replace the destroyed.connect line with this:
+        def handle_close():
+            # Stop audio playback if active
+            if plot_dialog.active_stream is not None:
+                try:
+                    plot_dialog.active_stream.stop()
+                    plot_dialog.active_stream.close()
+                except Exception as e:
+                    print(f"Error stopping audio: {e}")
+            
+            # Clean up other resources
+            self.cleanup_plot_window(plot_dialog.plot_id)
+        
+        plot_dialog.finished.connect(handle_close)  # <-- REPLACED LINE
 
         # Track open windows
         self.plot_windows.append(plot_dialog)
@@ -1145,8 +1169,6 @@ class ControlMenu(QDialog):
         plot_dialog.show()
         return plot_dialog
 
-
-    # STFT + Spectrogram
 
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
@@ -1236,7 +1258,7 @@ class ControlMenu(QDialog):
             
             # Create and show the plot dialog with live analysis button
             plot_dialog = self.create_stft_plot_dialog(self.current_figure, ax1, self.audio)
-            
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
@@ -1478,7 +1500,6 @@ class ControlMenu(QDialog):
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
-    #similar to createSpanSelector just this takes the audio
     def create_span_selector(self, ax, audio_signal, plot_dialog):
         """Create a span selector for a specific axis within a plot window"""
 
