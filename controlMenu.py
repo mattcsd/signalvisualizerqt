@@ -1080,9 +1080,6 @@ class ControlMenu(QDialog):
             
             fig.colorbar(img, cax=cbar_ax, format="%+2.0f dB")
             
-            #is not very accurate
-            #self.annotate_brightest_frequencies(ax1, S_db, hop_size, nfft)
-
             if show_pitch:
                 pitch, pitch_values = self.calculate_pitch()
                 pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
@@ -1482,11 +1479,17 @@ class ControlMenu(QDialog):
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
     #similar to createSpanSelector just this takes the audio
-    def create_span_selector(self, ax, audio_signal, plot_id):
+    def create_span_selector(self, ax, audio_signal, plot_dialog):
         """Create a span selector for a specific axis within a plot window"""
 
         def onselect(xmin, xmax):
-            self.stop_all_audio()
+            # Stop any existing playback for this window
+            if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream is not None:
+                try:
+                    plot_dialog.active_stream.stop()
+                    plot_dialog.active_stream.close()
+                except Exception as e:
+                    print(f"Error stopping previous stream: {e}")
 
             # Convert time to sample indices
             start_sample = int(xmin * self.fs)
@@ -1504,39 +1507,40 @@ class ControlMenu(QDialog):
                 return
 
             segment = audio_signal[start_sample:end_sample].astype(np.float32)
-            self.stream_pos = 0
-            self.stream_data = segment
+            stream_pos = 0  # Now local to this function
+            stream_data = segment  # Now local to this function
             total_length = len(segment)
 
             def callback(outdata, frames, time, status):
                 if status:
                     print("Stream status:", status)
 
-                remaining = total_length - self.stream_pos
+                nonlocal stream_pos
+                remaining = total_length - stream_pos
                 if remaining <= 0:
                     raise sd.CallbackStop()
 
                 n_frames = min(frames, remaining)
-                chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
+                chunk = stream_data[stream_pos:stream_pos + n_frames]
 
                 if n_frames < frames:
                     chunk = np.pad(chunk, (0, frames - n_frames))
 
                 outdata[:, 0] = chunk
-                self.stream_pos += n_frames
+                stream_pos += n_frames
 
-                if self.stream_pos >= total_length:
+                if stream_pos >= total_length:
                     raise sd.CallbackStop()
 
             try:
-                self.active_stream = sd.OutputStream(
+                plot_dialog.active_stream = sd.OutputStream(
                     samplerate=self.fs,
                     channels=1,
                     dtype='float32',
                     callback=callback,
                     blocksize=4096,
                 )
-                self.active_stream.start()
+                plot_dialog.active_stream.start()
             except Exception as e:
                 print("Error starting audio stream:", e)
 
@@ -1552,11 +1556,11 @@ class ControlMenu(QDialog):
             ax.figure.canvas.draw_idle()
 
         # Ensure this plot ID has a selector list
-        if plot_id not in self.span_selectors:
-            self.span_selectors[plot_id] = []
+        if plot_dialog.plot_id not in self.span_selectors:
+            self.span_selectors[plot_dialog.plot_id] = []
 
         # Disconnect any existing selector on this axis
-        for existing_selector in self.span_selectors[plot_id]:
+        for existing_selector in self.span_selectors[plot_dialog.plot_id]:
             if getattr(existing_selector, 'ax', None) == ax:
                 try:
                     existing_selector.disconnect_events()
@@ -1572,7 +1576,7 @@ class ControlMenu(QDialog):
             drag_from_anywhere=True
         )
         selector.ax = ax
-        self.span_selectors[plot_id].append(selector)
+        self.span_selectors[plot_dialog.plot_id].append(selector)
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms with optional pitch curves."""
@@ -1794,6 +1798,7 @@ class ControlMenu(QDialog):
         # Store references
         plot_dialog.figure = figure
         plot_dialog.waveform_ax = waveform_ax
+        plot_dialog.active_stream = None  # This will store the sounddevice stream for this window
         self.current_figure = figure
 
         layout = QVBoxLayout()
@@ -1804,12 +1809,31 @@ class ControlMenu(QDialog):
         plot_dialog.setLayout(layout)
 
         def handle_close():
+            # Stop audio playback for this specific window if active
+            if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream is not None:
+                try:
+                    plot_dialog.active_stream.stop()
+                    plot_dialog.active_stream.close()
+                except Exception as e:
+                    print(f"Error stopping stream: {e}")
+                plot_dialog.active_stream = None
+            
+            # Clean up span selectors for this window
+            if plot_dialog.plot_id in self.span_selectors:
+                for selector in self.span_selectors[plot_dialog.plot_id]:
+                    try:
+                        selector.disconnect_events()
+                    except Exception:
+                        pass
+                del self.span_selectors[plot_dialog.plot_id]
+            
             self.on_plot_window_close(plot_dialog.plot_id)
+        
         plot_dialog.finished.connect(handle_close)
 
         # Only create selector if valid
         if create_selector and waveform_ax is not None and audio_signal is not None:
-            self.create_span_selector(waveform_ax, audio_signal, plot_dialog.plot_id)
+            self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
 
         self.plot_windows.append(plot_dialog)
         plot_dialog.show()
