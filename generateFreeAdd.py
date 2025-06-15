@@ -163,7 +163,7 @@ class FreeAdditionPureTones(QDialog):
         if hasattr(self, 'help') and self.help:
             try:
                 # Help ID 2 corresponds to "Addition of tones" help
-                self.help.createHelpMenu(1)  
+                self.help.createHelpMenu(2)  
             except Exception as e:
                 QMessageBox.warning(self, "Help Error", 
                                    f"Could not open help: {str(e)}")
@@ -233,7 +233,7 @@ class FreeAdditionPureTones(QDialog):
         self.piano = QDialog(self)
         self.piano.setWindowTitle("Piano Keyboard")
         self.piano.setWindowIcon(QIcon('icons/icon.ico'))
-        self.piano.setFixedSize(1000, 350)  # Larger window for more keys
+        self.piano.setFixedSize(1000, 350)
         
         main_layout = QVBoxLayout()
         self.piano.setLayout(main_layout)
@@ -243,9 +243,13 @@ class FreeAdditionPureTones(QDialog):
         octave_layout.addWidget(QLabel("Octave:"))
         
         self.octave_spinbox = QSpinBox()
-        self.octave_spinbox.setRange(1, 8)  # Now supports 8 octaves
-        self.octave_spinbox.setValue(4)  # Middle C (C4) as default
+        self.octave_spinbox.setRange(1, 8)
+        self.octave_spinbox.setValue(4)
+        self.octave_spinbox.valueChanged.connect(self.update_piano_labels)  # Connect value change
         octave_layout.addWidget(self.octave_spinbox)
+        
+        # Store references to all piano keys
+        self.piano_keys = []
         
         main_layout.addLayout(octave_layout)
         
@@ -254,7 +258,7 @@ class FreeAdditionPureTones(QDialog):
         keys_layout = QGridLayout()
         keys_widget.setLayout(keys_layout)
         
-        # Piano key configuration - 2 octaves shown at once
+        # Piano key configuration
         white_notes = [
             ('C', 0), ('D', 2), ('E', 4), ('F', 5), ('G', 7), ('A', 9), ('B', 11),
             ('C', 12), ('D', 14), ('E', 16), ('F', 17), ('G', 19), ('A', 21), ('B', 23)
@@ -265,12 +269,14 @@ class FreeAdditionPureTones(QDialog):
             ('C#', 13), ('D#', 15), None, ('F#', 18), ('G#', 20), ('A#', 22)
         ]
         
-        # Create white keys
+        # Create white keys with black text
         for i, (note, value) in enumerate(white_notes):
-            btn = QPushButton(f"{note}\n{self.get_note_name(value)}")
+            btn = QPushButton()
+            btn.note_value = value
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: white;
+                    color: black;  /* Black text */
                     border: 1px solid #ccc;
                     min-width: 50px;
                     min-height: 200px;
@@ -282,14 +288,16 @@ class FreeAdditionPureTones(QDialog):
                     background-color: #ddd;
                 }
             """)
-            btn.clicked.connect(lambda _, v=value: self.playNote(v))
+            btn.clicked.connect(lambda checked, v=value: self.playPianoNote(v))  # Modified connection
             keys_layout.addWidget(btn, 1, i*2, 2, 2)
+            self.piano_keys.append(btn)
         
         # Create black keys
         for i, key_info in enumerate(black_notes):
             if key_info is not None:
                 note, value = key_info
-                btn = QPushButton(f"{note}\n{self.get_note_name(value)}")
+                btn = QPushButton()
+                btn.note_value = value
                 btn.setStyleSheet("""
                     QPushButton {
                         background-color: black;
@@ -306,31 +314,93 @@ class FreeAdditionPureTones(QDialog):
                         background-color: #555;
                     }
                 """)
-                btn.clicked.connect(lambda _, v=value: self.playNote(v))
+                btn.clicked.connect(lambda checked, v=value: self.playPianoNote(v))  # Modified connection
                 keys_layout.addWidget(btn, 0, (i*2)+1, 1, 2)
+                self.piano_keys.append(btn)
         
         main_layout.addWidget(keys_widget)
         
-        # Add navigation buttons for different octave ranges
+        # Navigation buttons
         nav_layout = QHBoxLayout()
         prev_btn = QPushButton("◄ Previous Octave")
-        prev_btn.clicked.connect(lambda: self.octave_spinbox.setValue(max(1, self.octave_spinbox.value()-1)))
+        prev_btn.clicked.connect(self.decrease_octave)
         next_btn = QPushButton("Next Octave ►")
-        next_btn.clicked.connect(lambda: self.octave_spinbox.setValue(min(8, self.octave_spinbox.value()+1)))
+        next_btn.clicked.connect(self.increase_octave)
         
         nav_layout.addWidget(prev_btn)
         nav_layout.addWidget(next_btn)
         main_layout.addLayout(nav_layout)
         
+        # Initial label update
+        self.update_piano_labels()
+        
         def on_close():
-            self.piano = None  # Important: release reference
+            self.piano = None
             if hasattr(self, 'piano_btn'):
                 self.piano_btn.setEnabled(True)
-    
+        
         self.piano.finished.connect(on_close)
         self.piano.show()
         if hasattr(self, 'piano_btn'):
             self.piano_btn.setEnabled(False)
+
+    def playPianoNote(self, note_value):
+        """Play note and update frequency fields"""
+        try:
+            # First update the frequency fields
+            self.notesHarmonics(note_value)
+            
+            # Then play the sound
+            octave = self.octave_spinbox.value()
+            midi_note = note_value + (octave * 12)
+            frequency = 440 * (2 ** ((midi_note - 69) / 12))
+            
+            duration = 0.5  # seconds
+            samples = int(duration * self.fs)
+            fade_samples = int(0.02 * self.fs)
+            
+            t = np.linspace(0, duration, samples, False)
+            signal = (0.6 * np.sin(2 * np.pi * frequency * t) +
+                     0.3 * np.sin(2 * np.pi * 2 * frequency * t) +
+                     0.1 * np.sin(2 * np.pi * 3 * frequency * t))
+            
+            if fade_samples > 0:
+                fade_in = np.linspace(0, 1, fade_samples) ** 2
+                fade_out = np.linspace(1, 0, fade_samples) ** 2
+                signal[:fade_samples] *= fade_in
+                signal[-fade_samples:] *= fade_out
+            
+            with sd.OutputStream(samplerate=self.fs, blocksize=2048, channels=1) as stream:
+                stream.write(signal.astype(np.float32))
+                
+        except Exception as e:
+            print(f"Error playing note: {e}")
+
+    def update_piano_labels(self):
+        """Update all piano key labels based on current octave"""
+        current_octave = self.octave_spinbox.value()
+        for btn in self.piano_keys:
+            note_value = btn.note_value
+            note_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+            note_name = note_names[note_value % 12]
+            octave = current_octave + (note_value // 12)
+            btn.setText(f"{note_name}\n{octave}")
+
+
+
+    def decrease_octave(self):
+        """Decrease octave and update labels"""
+        current = self.octave_spinbox.value()
+        if current > 1:
+            self.octave_spinbox.setValue(current - 1)
+
+    def increase_octave(self):
+        """Increase octave and update labels"""
+        current = self.octave_spinbox.value()
+        if current < 8:
+            self.octave_spinbox.setValue(current + 1)
+
+
 
     def get_note_name(self, note_value):
         """Convert MIDI note number to scientific pitch notation (e.g., C4)"""
@@ -351,63 +421,71 @@ class FreeAdditionPureTones(QDialog):
                 print(f"Audio playback error: {e}")
 
     def playNote(self, note_value):
-        """Glitch-free note playback with proper audio stream management"""
+        """Play note and update frequency fields"""
         try:
             # Calculate frequency
             octave = self.octave_spinbox.value()
             midi_note = note_value + (octave * 12)
             frequency = 440 * (2 ** ((midi_note - 69) / 12))
             
-            # Audio parameters
+            # Update the frequency fields with harmonics
+            self.notesHarmonics(note_value)
+            
+            # Audio playback (same as before)
             duration = 0.5  # seconds
             samples = int(duration * self.fs)
-            fade_samples = int(0.02 * self.fs)  # 20ms fade in/out
+            fade_samples = int(0.02 * self.fs)
             
-            # Generate signal with harmonics and fade
             t = np.linspace(0, duration, samples, False)
-            
-            # Create richer sound with harmonics
             signal = (0.6 * np.sin(2 * np.pi * frequency * t) +
                      0.3 * np.sin(2 * np.pi * 2 * frequency * t) +
                      0.1 * np.sin(2 * np.pi * 3 * frequency * t))
             
-            # Apply fade in/out
             if fade_samples > 0:
-                fade_in = np.linspace(0, 1, fade_samples) ** 2  # Quadratic fade for smoother start
+                fade_in = np.linspace(0, 1, fade_samples) ** 2
                 fade_out = np.linspace(1, 0, fade_samples) ** 2
                 signal[:fade_samples] *= fade_in
                 signal[-fade_samples:] *= fade_out
             
-            # Use sounddevice's stream for better performance
             with sd.OutputStream(samplerate=self.fs, blocksize=2048, channels=1) as stream:
                 stream.write(signal.astype(np.float32))
-            
-            # Update UI
-            self.freq_spinboxes[0].setValue(round(frequency, 2))
-            self.amp_sliders[0].setValue(100)
-            
+                
         except Exception as e:
             print(f"Audio error: {e}")
 
     def notesHarmonics(self, note_value):
-        """Handle piano key presses with the new note numbering"""
-        octave = self.octave_spinbox.value()
-        # Convert to frequency (A4 = 440Hz is note 69 in MIDI)
-        fundfreq = 440 * (2 ** ((note_value - 69 + (octave-4)*12) / 12))
-        
-        # Set fundamental frequency
-        self.freq_spinboxes[0].setValue(round(fundfreq, 2))
-        self.amp_sliders[0].setValue(100)  # 1.0
-        
-        # Set harmonics (2nd through 6th)
-        harmonics = [(2, 0.83), (3, 0.67), (4, 0.5), (5, 0.33), (6, 0.17)]
-        for i, (multiple, amp) in enumerate(harmonics, start=1):
-            freq = fundfreq * multiple
-            self.freq_spinboxes[i].setValue(round(freq, 2))
-            self.amp_sliders[i].setValue(int(amp * 100))
-        
-        self.plotFAPT()
-    
+        """Update all frequency fields with fundamental and harmonics"""
+        try:
+            octave = self.octave_spinbox.value()
+            # Convert to frequency (A4 = 440Hz is note 69 in MIDI)
+            midi_note = note_value + (octave * 12)
+            fundfreq = 440 * (2 ** ((midi_note - 69) / 12))
+            
+            # Set fundamental frequency (1st harmonic)
+            self.freq_spinboxes[0].setValue(int(round(fundfreq)))
+            self.amp_sliders[0].setValue(100)  # 1.0 amplitude
+            
+            # Set harmonics (2nd through 6th)
+            harmonics = [
+                (2, 0.83),  # 2nd harmonic
+                (3, 0.67),   # 3rd harmonic
+                (4, 0.5),    # 4th harmonic
+                (5, 0.33),   # 5th harmonic
+                (6, 0.17)    # 6th harmonic
+            ]
+            
+            for i, (multiple, amp) in enumerate(harmonics, start=1):
+                if i < len(self.freq_spinboxes):  # Safety check
+                    freq = fundfreq * multiple
+                    self.freq_spinboxes[i].setValue(int(round(freq)))
+                    self.amp_sliders[i].setValue(int(amp * 100))
+            
+            # Automatically update the plot
+            self.plotFAPT()
+            
+        except Exception as e:
+            print(f"Error updating harmonics: {e}")
+
     def togglePiano(self):
         """Properly manage piano window lifecycle"""
         if not self.pianoOpen:
