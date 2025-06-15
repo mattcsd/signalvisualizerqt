@@ -21,6 +21,8 @@ import time
 import matplotlib.gridspec as gridspec
 import matplotlib.gridspec as gridspec
 from matplotlib.widgets import SpanSelector
+from matplotlib import patches
+
 
 class ControlMenu(QDialog):
     def __init__(self, name, fs, audio, duration, controller):
@@ -1736,61 +1738,107 @@ class ControlMenu(QDialog):
     # Plot methods
 
     def create_span_selector(self, ax, audio_signal, plot_dialog):
-        """Create a span selector for a specific axis within a plot window"""
-
         def onselect(xmin, xmax):
-            # Stop any existing playback for this window
-            # Only proceed if this is a real selection (not a click)
             if xmin == xmax:
-                return
+                return  # Ignore clicks
 
-            if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream is not None:
+            # Stop any existing stream
+            if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream:
                 try:
                     plot_dialog.active_stream.stop()
                     plot_dialog.active_stream.close()
-                except Exception as e:
-                    print(f"Error stopping previous stream: {e}")
+                except Exception:
+                    pass
+                plot_dialog.active_stream = None
 
-            # Convert time to sample indices
+            # Stop previous cursor updates
+            if hasattr(plot_dialog, 'cursor_timer'):
+                plot_dialog.cursor_timer.stop()
+            if hasattr(plot_dialog, 'cursor_line'):
+                try:
+                    plot_dialog.cursor_line.remove()
+                except Exception:
+                    pass
+
+            # Audio slicing
             start_sample = int(xmin * self.fs)
             end_sample = int(xmax * self.fs)
 
-            # Safety check
-            if start_sample >= end_sample or end_sample > len(audio_signal):
-                # Show popup error message
-                QMessageBox.warning(self, "Invalid Selection", "Please select a valid time range.")
-                
-                # Clear the selection line by redrawing it (resetting selection)
-                self.span_selector.visible = False
-                ax.figure.canvas.draw()
-                self.span_selector.visible = True
+            if start_sample >= end_sample:
                 return
 
+            # --- Keep visible span selection ---
+            ymin, ymax = ax.get_ylim()
+            # Remove previous visible span, if it exists
+            if hasattr(plot_dialog, 'visible_span_patch'):
+                try:
+                    plot_dialog.visible_span_patch.remove()
+                except Exception:
+                    pass
+
+            # Add new visible rectangle to show selection
+            rect = patches.Rectangle(
+                (xmin, ymin),
+                xmax - xmin,
+                ax.get_ylim()[1] - ax.get_ylim()[0],
+                linewidth=0,
+                edgecolor=None,
+                facecolor='red',
+                alpha=0.3,
+                zorder=1,
+            )
+            plot_dialog.visible_span_patch = rect
+            ax.add_patch(rect)
+            ax.set_ylim(ymin, ymax)
+
+
             segment = audio_signal[start_sample:end_sample].astype(np.float32)
-            stream_pos = 0  # Now local to this function
-            stream_data = segment  # Now local to this function
-            total_length = len(segment)
+            total_len = len(segment)
+            stream_pos = 0
 
-            def callback(outdata, frames, time, status):
-                if status:
-                    print("Stream status:", status)
+            # Cursor init
+            canvas = ax.figure.canvas
+            plot_dialog.cursor_line, = ax.plot([xmin, xmin], ax.get_ylim(), 'r', linewidth=1.2)
+            canvas.draw()
+            plot_dialog._background = canvas.copy_from_bbox(ax.bbox)
 
+            t0 = time.time()
+
+            def update_cursor():
+                elapsed = time.time() - t0
+                current_time = xmin + elapsed
+
+                if current_time >= xmax:
+                    plot_dialog.cursor_timer.stop()
+                    return
+
+                plot_dialog.cursor_line.set_xdata([current_time, current_time])
+                canvas.restore_region(plot_dialog._background)
+                ax.draw_artist(plot_dialog.cursor_line)
+                canvas.blit(ax.bbox)
+
+            plot_dialog.cursor_timer = QTimer()
+            plot_dialog.cursor_timer.timeout.connect(update_cursor)
+            plot_dialog.cursor_timer.start(30)
+
+            # Audio playback
+            def callback(outdata, frames, time_info, status):
                 nonlocal stream_pos
-                remaining = total_length - stream_pos
+                if status:
+                    print(status)
+
+                remaining = total_len - stream_pos
                 if remaining <= 0:
                     raise sd.CallbackStop()
 
-                n_frames = min(frames, remaining)
-                chunk = stream_data[stream_pos:stream_pos + n_frames]
+                n = min(frames, remaining)
+                chunk = segment[stream_pos:stream_pos + n]
 
-                if n_frames < frames:
-                    chunk = np.pad(chunk, (0, frames - n_frames))
+                if n < frames:
+                    chunk = np.pad(chunk, (0, frames - n))
 
                 outdata[:, 0] = chunk
-                stream_pos += n_frames
-
-                if stream_pos >= total_length:
-                    raise sd.CallbackStop()
+                stream_pos += frames
 
             try:
                 plot_dialog.active_stream = sd.OutputStream(
@@ -1798,46 +1846,20 @@ class ControlMenu(QDialog):
                     channels=1,
                     dtype='float32',
                     callback=callback,
-                    blocksize=4096,
+                    blocksize=1024,
                 )
                 plot_dialog.active_stream.start()
             except Exception as e:
-                print("Error starting audio stream:", e)
+                print("Audio stream error:", e)
 
-            # Visual: remove old span if any and draw new
-            try:
-                for patch in list(ax.patches):
-                    if hasattr(patch, 'get_label') and patch.get_label() == 'selection':
-                        patch.remove()
-            except Exception:
-                pass
+        self.span_selector = SpanSelector(ax, onselect, 'horizontal', useblit=True,
+                                          props=dict(alpha=0.3, facecolor='red'))
 
-            ax.axvspan(xmin, xmax, color='red', alpha=0.3, label='selection')
-            ax.figure.canvas.draw_idle()
+        if not hasattr(self, 'span_selectors'):
+            self.span_selectors = {}
+        self.span_selectors[plot_dialog.plot_id] = [self.span_selector]
 
-        # Ensure this plot ID has a selector list
-        if plot_dialog.plot_id not in self.span_selectors:
-            self.span_selectors[plot_dialog.plot_id] = []
 
-        # Disconnect any existing selector on this axis
-        for existing_selector in self.span_selectors[plot_dialog.plot_id]:
-            if getattr(existing_selector, 'ax', None) == ax:
-                try:
-                    existing_selector.disconnect_events()
-                except Exception:
-                    pass
-
-        selector = SpanSelector(
-            ax,
-            onselect,
-            'horizontal',
-            useblit=True,
-            interactive=True,
-            drag_from_anywhere=True,
-            ignore_event_outside=True  # Important for clean interaction
-        )
-        selector.ax = ax
-        self.span_selectors[plot_dialog.plot_id].append(selector)
 
     def cleanup_plot_window(self, plot_id):
         """Clean up when any plot window closes"""
@@ -1886,7 +1908,6 @@ class ControlMenu(QDialog):
         plot_dialog.setLayout(layout)
 
         def handle_close():
-            # Stop audio playback for this specific window if active
             if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream is not None:
                 try:
                     plot_dialog.active_stream.stop()
@@ -1894,8 +1915,13 @@ class ControlMenu(QDialog):
                 except Exception as e:
                     print(f"Error stopping stream: {e}")
                 plot_dialog.active_stream = None
-            
-            # Clean up span selectors for this window
+
+            if hasattr(plot_dialog, 'cursor_timer'):
+                plot_dialog.cursor_timer.stop()
+
+            if hasattr(plot_dialog, 'cursor_line'):
+                plot_dialog.cursor_line.remove()
+
             if plot_dialog.plot_id in self.span_selectors:
                 for selector in self.span_selectors[plot_dialog.plot_id]:
                     try:
@@ -1903,9 +1929,9 @@ class ControlMenu(QDialog):
                     except Exception:
                         pass
                 del self.span_selectors[plot_dialog.plot_id]
-            
+
             self.on_plot_window_close(plot_dialog.plot_id)
-        
+                
         plot_dialog.finished.connect(handle_close)
 
         # Only create selector if valid
