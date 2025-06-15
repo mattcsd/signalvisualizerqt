@@ -938,8 +938,14 @@ class ControlMenu(QDialog):
         # No need to write to file - we can work directly with the audio array
         audio = self.audio.astype(np.float32)  # Ensure correct dtype for librosa
         
-        # Plot waveform
+
+        duration = len(audio) / self.fs  # This is the correct way
+        # Plot waveform with proper xlim
         ax[0].plot(self.time, audio)
+        ax[0].set_xlim([0, duration])  # Set x-axis limits based on actual duration
+        ax[0].set_title('Waveform')
+
+
         
         # Calculate pitch using librosa
         if method == 'Autocorrelation':
@@ -970,6 +976,8 @@ class ControlMenu(QDialog):
             sr=self.fs,
             hop_length=hop_length
         )
+
+
         
         # Plot pitch contour
         ax[1].plot(frame_time, pitch_values, '-')
@@ -1092,9 +1100,6 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
-
-
-    
 
     # STFT + Spectrogram
 
