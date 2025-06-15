@@ -837,7 +837,7 @@ class ControlMenu(QDialog):
         self.mid_point_idx = np.searchsorted(self.time, event.xdata)
         self.mid_point_idx = min(self.mid_point_idx, len(self.time) - 1)
         self.update_stft_plot(ax)
-        
+
     def update_stft_plot(self, ax):
         """Update plot with proper array handling"""
         for a in ax:
@@ -1440,20 +1440,26 @@ class ControlMenu(QDialog):
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def on_sc_window_click(self, event, ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft):
-        """Handle mouse clicks to move analysis window"""
-        if event.inaxes != ax1 or event.button != 1 or event.dblclick:
+        """Handle ONLY simple clicks for spectral centroid window movement"""
+        if event.inaxes != ax1 or event.button != 1:
             return
-        
+            
+        # Skip if this is part of a drag operation
         if hasattr(event, 'pressed') and event.pressed:
             return
-
-        # Update window center position
+            
+        # Skip if we're currently dragging a span selector
+        if hasattr(self, '_is_dragging_span') and self._is_dragging_span:
+            return
+            
+        # Move analysis window to click position
         self.sc_mid_point_idx = np.searchsorted(self.time, event.xdata)
         self.sc_mid_point_idx = min(self.sc_mid_point_idx, len(self.time) - 1)
         
         # Redraw with new position
         self.update_spectral_centroid_plot(ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft)
 
+    
     def update_spectral_centroid_plot(self, ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft):
         """Update all plots with current window position"""
         # Clear previous plots
