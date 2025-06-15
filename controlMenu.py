@@ -1496,9 +1496,11 @@ class ControlMenu(QDialog):
         
         # Create span selectors for both signals
         #self.create_span_selector(ax[0], self.audio, plot_id)  # Note: ax[0] not ax0
-        self.create_span_selector(ax[1], filtered_signal, plot_id)  # Note: ax[1] not ax1
         
-        self.show_plot_window(self.current_figure, ax[0], self.audio)
+        plot_dialog = self.show_plot_window(self.current_figure, ax[0], self.audio)
+
+        self.create_span_selector(ax[1], filtered_signal, plot_dialog)  # Note: ax[1] not ax1
+
 
     def create_span_selector(self, ax, audio_signal, plot_dialog):
         """Create a span selector for a specific axis within a plot window"""
@@ -1648,9 +1650,6 @@ class ControlMenu(QDialog):
             
 
             ax0.set(title='Original Signal Spectrogram')
-            #not work
-            print(f"Creating span selector for ax0 (original) - plot_id={plot_id}")
-            self.create_span_selector(ax0, self.audio, plot_id)
 
             if show_pitch:
                 _, pitch_smoothed = self.calculate_pitch(signal=self.audio)
@@ -1686,8 +1685,6 @@ class ControlMenu(QDialog):
 
             ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
             
-            print(f"Creating span selector for ax1 (filtered) - plot_id={plot_id}")
-            self.create_span_selector(ax1, filtered_signal, plot_id)
 
             if show_pitch:
                 _, pitch_smoothed_filt = self.calculate_pitch(signal=filtered_signal)
@@ -1709,7 +1706,11 @@ class ControlMenu(QDialog):
 
             #first change
             self.current_figure.tight_layout()
-            self.show_plot_window(self.current_figure, None, None, create_selector=False)
+            plot_dialog = self.show_plot_window(self.current_figure, None, None, create_selector=False)
+
+            self.create_span_selector(ax0, self.audio, plot_dialog)
+            self.create_span_selector(ax1, filtered_signal, plot_dialog)
+
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
