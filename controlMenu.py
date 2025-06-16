@@ -1553,33 +1553,33 @@ class ControlMenu(QDialog):
     # Filtered section.
 
     def plot_filtered_waveform(self, filter_type, filtered_signal):
-        """Plot original and filtered waveforms with proper span selectors"""
-        self.current_figure, ax = plt.subplots(2, figsize=(12,6))
+        """Plot original and filtered waveforms with proper span selectors in same window"""
+        self.current_figure, ax = plt.subplots(2, figsize=(12, 6))
         self.current_figure.suptitle(f'Filtered Signal ({filter_type}) - Waveform')
-        
-        # Plot original signal
+
+        # Plot original
         ax[0].plot(self.time, self.audio)
         ax[0].set(xlim=[0, self.duration], title='Original Signal')
-        
-        # Plot filtered signal
+
+        # Plot filtered
         ax[1].plot(self.time, filtered_signal)
         ax[1].set(xlim=[0, self.duration], title='Filtered Signal')
-        
-        # Get unique identifier for this plot window
-        plot_id = id(self.current_figure.canvas.manager.window)
-        
-        # Create span selectors for both signals
-        #self.create_span_selector(ax[0], self.audio, plot_id)  # Note: ax[0] not ax0
-        
-        plot_dialog = self.show_plot_window(self.current_figure, ax[0], self.audio)
 
-        self.create_span_selector(ax[1], filtered_signal, plot_dialog)  # Note: ax[1] not ax1
+        # One shared dialog window with both axes
+        shared_dialog = self.show_plot_window(self.current_figure, create_selector=False)
 
+        # Assign custom attributes to distinguish axes
+        shared_dialog.original_ax = ax[0]
+        shared_dialog.filtered_ax = ax[1]
+
+        # Create two separate span selectors, store them under the same dialog.plot_id
+        self.create_span_selector(ax[0], self.audio, shared_dialog, tag='original')
+        self.create_span_selector(ax[1], filtered_signal, shared_dialog, tag='filtered')
 
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
-        """Plot original and filtered spectrograms with optional pitch curves."""
+        """Plot original and filtered spectrograms in shared window with independent span selectors."""
         try:
-            # Validate parameters and get calculated values
+            # --- PARAMETERS ---
             params = self.validate_spectrogram_parameters()
             wind_size_samples = params['wind_size_samples']
             hop_size = params['hop_size']
@@ -1591,106 +1591,70 @@ class ControlMenu(QDialog):
             draw_style = self.draw_style.currentIndex() + 1
             window = self.get_window(wind_size_samples)
 
+            # Create figure and layout
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(2, 1, height_ratios=[1, 1])
-            plot_id = id(self.current_figure.canvas.manager.window)
 
-            # ---- ORIGINAL SPECTROGRAM ----
+            def compute_and_plot(ax, signal, title, pitch_color):
+                """Compute and plot the spectrogram (linear or mel) with optional pitch."""
+                if draw_style == 1:  # Linear
+                    D = librosa.stft(signal, n_fft=nfft, hop_length=hop_size,
+                                     win_length=wind_size_samples, window=window)
+                    S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
+                    img = librosa.display.specshow(S_db, x_axis='time', y_axis='linear',
+                                                   sr=self.fs, hop_length=hop_size,
+                                                   fmin=min_freq, fmax=max_freq, ax=ax)
+                    ax.set_ylim([min_freq, max_freq])
+                else:  # Mel
+                    S = librosa.feature.melspectrogram(y=signal, sr=self.fs,
+                                                       n_fft=nfft, hop_length=hop_size,
+                                                       win_length=wind_size_samples,
+                                                       window=window, fmin=min_freq,
+                                                       fmax=max_freq)
+                    S_db = librosa.power_to_db(S, ref=np.max)
+                    img = librosa.display.specshow(S_db, x_axis='time', y_axis='mel',
+                                                   sr=self.fs, hop_length=hop_size,
+                                                   fmin=min_freq, fmax=max_freq, ax=ax)
+
+                duration = librosa.frames_to_time(S_db.shape[1], sr=self.fs, hop_length=hop_size)
+                ax.set_xlim([0, duration])
+                ax.set(title=title)
+
+                if show_pitch:
+                    _, pitch_smoothed = self.calculate_pitch(signal=signal)
+                    pitch_times = librosa.times_like(pitch_smoothed, sr=self.fs, hop_length=hop_size)
+                    ax.plot(pitch_times, pitch_smoothed, '-', color=pitch_color,
+                            linewidth=2, alpha=0.9, label='Pitch')
+
+                return img, S_db
+
+            # Plot original spectrogram
             ax0 = plt.subplot(gs[0])
-            img0 = None
-            if draw_style == 1:
-                D_orig = librosa.stft(self.audio, n_fft=nfft, hop_length=hop_size,
-                                      win_length=wind_size_samples, window=window)
-                S_db_orig = librosa.amplitude_to_db(np.abs(D_orig), ref=np.max)
-                
+            img0, _ = compute_and_plot(ax0, self.audio, 'Original Signal Spectrogram', pitch_color='lime')
 
-                img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='linear',
-                                                sr=self.fs, hop_length=hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax0)
-                # Manually set y-axis frequency range
-                ax0.set_ylim([min_freq, max_freq])
-            else:
-                S_orig = librosa.feature.melspectrogram(y=self.audio, sr=self.fs,
-                                                        n_fft=nfft, hop_length=hop_size,
-                                                        win_length=wind_size_samples,
-                                                        window=window, fmin=min_freq,
-                                                        fmax=max_freq)
-                S_db_orig = librosa.power_to_db(S_orig, ref=np.max)
-                img0 = librosa.display.specshow(S_db_orig, x_axis='time', y_axis='mel',
-                                                sr=self.fs, hop_length=hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax0)
-            # correction  for the lengths
-            duration = librosa.frames_to_time(S_db_orig.shape[1], sr=self.fs, hop_length=hop_size)
-            ax0.set_xlim([0, duration])
-            
-
-            ax0.set(title='Original Signal Spectrogram')
-
-            if show_pitch:
-                _, pitch_smoothed = self.calculate_pitch(signal=self.audio)
-                pitch_times = librosa.times_like(pitch_smoothed, sr=self.fs, hop_length=hop_size)
-                ax0.plot(pitch_times, pitch_smoothed, '-', color='lime', linewidth=2, alpha=0.9, label='Pitch')
-
-
-            # ---- FILTERED SPECTROGRAM ----
+            # Plot filtered spectrogram
             ax1 = plt.subplot(gs[1])
-            img1 = None
-            if draw_style == 1:
-                D_filt = librosa.stft(filtered_signal, n_fft=nfft, hop_length=hop_size,
-                                      win_length=wind_size_samples, window=window)
-                S_db_filt = librosa.amplitude_to_db(np.abs(D_filt), ref=np.max)
-                img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='linear',
-                                                sr=self.fs, hop_length=hop_size,
-                                                ax=ax1)
+            img1, _ = compute_and_plot(ax1, filtered_signal,
+                                       f'Filtered Signal Spectrogram ({filter_type})', pitch_color='cyan')
 
-                # Manually set y-axis frequency range
-                ax1.set_ylim([min_freq, max_freq])
-            else:
-                S_filt = librosa.feature.melspectrogram(y=filtered_signal, sr=self.fs,
-                                                        n_fft=nfft, hop_length=hop_size,
-                                                        win_length=wind_size_samples,
-                                                        window=window, fmin=min_freq,
-                                                        fmax=max_freq)
-                S_db_filt = librosa.power_to_db(S_filt, ref=np.max)
-                img1 = librosa.display.specshow(S_db_filt, x_axis='time', y_axis='mel',
-                                                sr=self.fs, hop_length=hop_size,
-                                                fmin=min_freq, fmax=max_freq, ax=ax1)
-            duration_filt = librosa.frames_to_time(S_db_filt.shape[1], sr=self.fs, hop_length=hop_size)
-            ax1.set_xlim([0, duration_filt])
-
-            ax1.set(title=f'Filtered Signal Spectrogram ({filter_type})')
-            
-
-            if show_pitch:
-                _, pitch_smoothed_filt = self.calculate_pitch(signal=filtered_signal)
-                pitch_times_filt = librosa.times_like(pitch_smoothed_filt, sr=self.fs, hop_length=hop_size)
-                ax1.plot(pitch_times_filt, pitch_smoothed_filt, '-', color='cyan', linewidth=2, alpha=0.9, label='Pitch')
-                 #ax1.legend(loc='upper right')
-            '''
-            # ---- COLORBARS ----
-            if img0 is not None and img1 is not None:
-                self.current_figure.subplots_adjust(right=0.85)
-                cbar_ax0 = self.current_figure.add_axes([0.88, 0.55, 0.02, 0.35])
-                self.current_figure.colorbar(img0, cax=cbar_ax0, format="%+2.0f dB")
-                cbar_ax0.set_ylabel('Original Signal')
-
-                cbar_ax1 = self.current_figure.add_axes([0.88, 0.15, 0.02, 0.35])
-                self.current_figure.colorbar(img1, cax=cbar_ax1, format="%+2.0f dB")
-                cbar_ax1.set_ylabel('Filtered Signal')
-            '''
-
-            #first change
             self.current_figure.tight_layout()
-            plot_dialog = self.show_plot_window(self.current_figure, None, None, create_selector=False)
 
-            self.create_span_selector(ax0, self.audio, plot_dialog)
-            self.create_span_selector(ax1, filtered_signal, plot_dialog)
+            # Shared plot dialog for both axes
+            shared_dialog = self.show_plot_window(self.current_figure, create_selector=False)
 
+            # Tag each axis to distinguish selectors
+            shared_dialog.original_ax = ax0
+            shared_dialog.filtered_ax = ax1
+
+            # Independent span selectors on both plots with tags
+            self.create_span_selector(ax0, self.audio, shared_dialog, tag='original')
+            self.create_span_selector(ax1, filtered_signal, shared_dialog, tag='filtered')
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
             if self.current_figure:
                 plt.close(self.current_figure)
+
 
     def plot_filtering(self):
         filter_type = self.filter_type.currentText()
@@ -1759,9 +1723,7 @@ class ControlMenu(QDialog):
 
     # Plot methods
 
-
-
-    def create_span_selector(self, ax, audio_signal, plot_dialog):
+    def create_span_selector(self, ax, audio_signal, plot_dialog, tag='default'):
         def onselect(xmin, xmax):
             if xmin == xmax:
                 return
@@ -1907,12 +1869,17 @@ class ControlMenu(QDialog):
             except Exception as e:
                 print(f"Playback error: {e}")
 
-        self.span_selector = SpanSelector(ax, onselect, 'horizontal', useblit=True,
+        span_selector = SpanSelector(ax, onselect, 'horizontal', useblit=True,
                                         props=dict(alpha=0.3, facecolor='red'))
 
         if not hasattr(self, 'span_selectors'):
             self.span_selectors = {}
-        self.span_selectors[plot_dialog.plot_id] = [self.span_selector]
+        if plot_dialog.plot_id not in self.span_selectors:
+            self.span_selectors[plot_dialog.plot_id] = {}
+
+        # Store selector using the tag (e.g., 'original', 'filtered')
+        self.span_selectors[plot_dialog.plot_id][tag] = span_selector
+
 
 
 
