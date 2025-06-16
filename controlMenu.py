@@ -1099,7 +1099,12 @@ class ControlMenu(QDialog):
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
 
-            self.show_plot_window(fig, ax0, audio)
+            # Store both axes in the plot dialog by passing them as a tuple
+            plot_dialog = self.show_plot_window(fig, ax0, audio)
+            
+            # Store the spectrogram axis separately for easy access
+            plot_dialog.spectrogram_ax = ax1
+            return plot_dialog
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
@@ -1460,7 +1465,6 @@ class ControlMenu(QDialog):
         
         # Redraw with new position
         self.update_spectral_centroid_plot(ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft)
-
     
     def update_spectral_centroid_plot(self, ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft):
         """Update all plots with current window position"""
@@ -1757,6 +1761,8 @@ class ControlMenu(QDialog):
             if hasattr(plot_dialog, 'cursor_line'):
                 try:
                     plot_dialog.cursor_line.remove()
+                    if hasattr(plot_dialog, 'spectrogram_cursor_line'):
+                        plot_dialog.spectrogram_cursor_line.remove()
                 except Exception:
                     pass
 
@@ -1791,16 +1797,25 @@ class ControlMenu(QDialog):
             ax.add_patch(rect)
             ax.set_ylim(ymin, ymax)
 
-
             segment = audio_signal[start_sample:end_sample].astype(np.float32)
             total_len = len(segment)
             stream_pos = 0
 
-            # Cursor init
+            # Cursor init - for both waveform and spectrogram
             canvas = ax.figure.canvas
+            
+            # Get spectrogram axis if it exists
+            spectrogram_ax = getattr(plot_dialog, 'spectrogram_ax', None)
+            
+            # Create cursor lines
             plot_dialog.cursor_line, = ax.plot([xmin, xmin], ax.get_ylim(), 'r', linewidth=1.2)
+            if spectrogram_ax:
+                plot_dialog.spectrogram_cursor_line, = spectrogram_ax.plot([xmin, xmin], spectrogram_ax.get_ylim(), 'r', linewidth=1.2)
+            
             canvas.draw()
-            plot_dialog._background = canvas.copy_from_bbox(ax.bbox)
+            plot_dialog._background_waveform = canvas.copy_from_bbox(ax.bbox)
+            if spectrogram_ax:
+                plot_dialog._background_spectrogram = canvas.copy_from_bbox(spectrogram_ax.bbox)
 
             t0 = time.time()
 
@@ -1812,16 +1827,27 @@ class ControlMenu(QDialog):
                     plot_dialog.cursor_timer.stop()
                     return
 
+                # Update both cursor lines
                 plot_dialog.cursor_line.set_xdata([current_time, current_time])
-                canvas.restore_region(plot_dialog._background)
+                if hasattr(plot_dialog, 'spectrogram_cursor_line'):
+                    plot_dialog.spectrogram_cursor_line.set_xdata([current_time, current_time])
+                
+                # Blit both axes
+                canvas.restore_region(plot_dialog._background_waveform)
                 ax.draw_artist(plot_dialog.cursor_line)
                 canvas.blit(ax.bbox)
+                
+                if hasattr(plot_dialog, '_background_spectrogram'):
+                    canvas.restore_region(plot_dialog._background_spectrogram)
+                    spectrogram_ax.draw_artist(plot_dialog.spectrogram_cursor_line)
+                    canvas.blit(spectrogram_ax.bbox)
 
             plot_dialog.cursor_timer = QTimer()
             plot_dialog.cursor_timer.timeout.connect(update_cursor)
             plot_dialog.cursor_timer.start(30)
+            
 
-            # Audio playback
+            # Audio playback (unchanged)
             def callback(outdata, frames, time_info, status):
                 nonlocal stream_pos
                 if status:
@@ -1853,13 +1879,11 @@ class ControlMenu(QDialog):
                 print("Audio stream error:", e)
 
         self.span_selector = SpanSelector(ax, onselect, 'horizontal', useblit=True,
-                                          props=dict(alpha=0.3, facecolor='red'))
+                                        props=dict(alpha=0.3, facecolor='red'))
 
         if not hasattr(self, 'span_selectors'):
             self.span_selectors = {}
         self.span_selectors[plot_dialog.plot_id] = [self.span_selector]
-
-
 
     def cleanup_plot_window(self, plot_id):
         """Clean up when any plot window closes"""
@@ -1920,7 +1944,15 @@ class ControlMenu(QDialog):
                 plot_dialog.cursor_timer.stop()
 
             if hasattr(plot_dialog, 'cursor_line'):
-                plot_dialog.cursor_line.remove()
+                try:
+                    plot_dialog.cursor_line.remove()
+                except:
+                    pass
+            if hasattr(plot_dialog, 'spectrogram_cursor_line'):
+                try:
+                    plot_dialog.spectrogram_cursor_line.remove()
+                except:
+                    pass
 
             if plot_dialog.plot_id in self.span_selectors:
                 for selector in self.span_selectors[plot_dialog.plot_id]:
@@ -1931,6 +1963,7 @@ class ControlMenu(QDialog):
                 del self.span_selectors[plot_dialog.plot_id]
 
             self.on_plot_window_close(plot_dialog.plot_id)
+
                 
         plot_dialog.finished.connect(handle_close)
 
