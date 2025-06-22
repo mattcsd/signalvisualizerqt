@@ -190,7 +190,7 @@ class Start(QMainWindow):
                 border: 1px solid #3498db;
                 padding: 0.5em;
                 border-radius: 0.25em;
-                font-size: 16pt;
+                font-size: 18pt;
                 opacity: 230;
             }
         """)
@@ -267,7 +267,7 @@ class Start(QMainWindow):
                 text-align: left;
                 min-width: 12em;
                 min-height: 2.25em;
-                font-size: 1.1em;
+                font-size: 16pt;    #hover message font size
             }
             QToolButton:hover {
                 background-color: #3498db;
