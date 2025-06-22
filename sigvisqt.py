@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QMenuBar, QMenu, QAction, QMessageBox, QDesktopWidget
+from PyQt5.QtWidgets import QToolButton, QWidgetAction, QHBoxLayout, QAction, QApplication, QMenuBar, QMenu, QMainWindow, QWidget, QVBoxLayout, QMenuBar, QMenu, QAction, QMessageBox, QDesktopWidget
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
@@ -65,6 +65,7 @@ class Start(QMainWindow):
         # Set up the menu bar
         self.create_menu_bar()
 
+
     def show_welcome_dialog(self):
         dialog = FirstRunDialog(self)
         dialog.exec_()
@@ -128,24 +129,26 @@ class Start(QMainWindow):
             self.layout.addWidget(self.frames[page_name])
             self.frames[page_name].setVisible(True)
 
+
     def create_menu_bar(self):
-        """Create the menu bar for the application with improved styling."""
+        """Create the menu bar with button-style dropdown items that support tooltips"""
         menubar = self.menuBar()
         
-        # Apply responsive styling to the menu bar
+        # Keep your existing stylesheet for the menu bar itself
         menubar.setStyleSheet("""
+            /* Main menu bar */
             QMenuBar {
                 background-color: #2c3e50;
                 color: white;
-                font-size: 1em;  /* Using em units for better scaling */
+                font-size: 1em;
                 font-weight: bold;
-                padding: 0.5em;  /* Relative padding */
-                spacing: 0.5em;  /* Space between items */
+                padding: 0.5em;
+                spacing: 0.5em;
             }
             QMenuBar::item {
                 background-color: transparent;
-                padding: 0.5em 1em;  /* Relative padding */
-                border-radius: 4px;
+                padding: 0.5em 1em;
+                border-radius: 0.25em;
             }
             QMenuBar::item:selected {
                 background-color: #3498db;
@@ -153,63 +156,128 @@ class Start(QMainWindow):
             QMenuBar::item:pressed {
                 background-color: #2980b9;
             }
+            
+            /* Dropdown menus */
             QMenu {
                 background-color: #34495e;
                 color: white;
                 border: 1px solid #555;
-                font-size: 0.9em;  /* Slightly smaller than menu bar */
-                padding: 0.5em;
-                min-width: 8em;  /* Minimum width to prevent squishing */
+                padding: 0.25em;
+                font-size: 1em;
+                min-width: 12em;  /* Based on typical character width */
             }
-            QMenu::item {
-                padding: 0.3em 1.5em 0.3em 1em;  /* Top, right, bottom, left */
-                margin: 0.1em;
+            
+            /* Menu buttons */
+            QToolButton {
+                background-color: transparent;
+                color: white;
+                border: none;
+                padding: 0.75em 1.5em;
+                text-align: left;
+                min-width: 12em;
+                min-height: 2.25em;
+                font-size: 1em;
             }
-            QMenu::item:selected {
+            QToolButton:hover {
                 background-color: #3498db;
+                border-radius: 0.2em;
             }
-            QMenu::separator {
-                height: 1px;
-                background: #555;
-                margin: 0.3em 0;
+            
+            /* Tooltips */
+            QToolTip {
+                background-color: #34495e;
+                color: white;
+                border: 1px solid #3498db;
+                padding: 0.5em;
+                border-radius: 0.25em;
+                font-size: 16pt;
+                opacity: 230;
             }
         """)
-
-
         # Signal Visualizer menu
         signal_menu = menubar.addMenu("Signal Visualizer")
-        signal_menu.addAction("Info", lambda: self.initialize_frame('Info'))
-        signal_menu.addAction("Exit", self.close)
+        self._add_menu_button(signal_menu, "Info", "Show application information and instructions", 
+                            lambda: self.initialize_frame('Info'))
+        self._add_menu_button(signal_menu, "Exit", "Exit the application", self.close)
 
         # Generate menu
         generate_menu = menubar.addMenu("Generate")
-        generate_menu.addAction("Pure tone", lambda: self.initialize_frame('PureTone'))
-        generate_menu.addAction("Free addition of pure tones", lambda: self.initialize_frame('FreeAdditionPureTones'))
-        generate_menu.addAction("Noise", lambda: self.initialize_frame('Noise'))
+        self._add_menu_button(generate_menu, "Pure tone", "Generate a single frequency sine wave",
+                             lambda: self.initialize_frame('PureTone'))
+        self._add_menu_button(generate_menu, "Free addition of pure tones", 
+                            "Combine multiple sine waves with custom frequencies",
+                            lambda: self.initialize_frame('FreeAdditionPureTones'))
+        self._add_menu_button(generate_menu, "Noise", "Generate different types of noise signals",
+                             lambda: self.initialize_frame('Noise'))
 
         # Known periodic signals submenu
         known_menu = generate_menu.addMenu("Known periodic signals")
-        known_menu.addAction("Square wave", lambda: self.initialize_frame('SquareWave'))
-        known_menu.addAction("Sawtooth wave", lambda: self.initialize_frame('SawtoothWave'))
+        self._add_menu_button(known_menu, "Square wave", "Generate a square wave signal",
+                             lambda: self.initialize_frame('SquareWave'))
+        self._add_menu_button(known_menu, "Sawtooth wave", "Generate a sawtooth wave signal",
+                             lambda: self.initialize_frame('SawtoothWave'))
 
         # Input menu
         input_menu = menubar.addMenu("Input")
-        input_menu.addAction("Load", lambda: self.initialize_frame('Load'))
-        input_menu.addAction("Record", lambda: self.initialize_frame('Record'))
+        self._add_menu_button(input_menu, "Load", "Load an audio file from disk",
+                             lambda: self.initialize_frame('Load'))
+        self._add_menu_button(input_menu, "Record", "Record audio from your microphone",
+                             lambda: self.initialize_frame('Record'))
 
+        # Tuner menu
         tuner_menu = menubar.addMenu("Tuner")
-        tuner_menu.addAction("Live STFT", lambda: self.initialize_frame('Tuner'))
-        
-        # Add new menu item
+        self._add_menu_button(tuner_menu, "Live STFT", "Real-time frequency analysis for tuning instruments",
+                             lambda: self.initialize_frame('Tuner'))
+
+        # Tools menu
         tools_menu = menubar.addMenu("Tools")
-        tools_menu.addAction("Fundamental/Harmonics Separator", 
-                        lambda: self.show_separator_tool())
+        self._add_menu_button(tools_menu, "Fundamental/Harmonics Separator",
+                            "Separate fundamental frequency from harmonics",
+                            lambda: self.show_separator_tool())
 
+        # Examples menu
         examples_menu = menubar.addMenu("Examples")
-        examples_menu.addAction("Cretan Lute", lambda: self.initialize_frame('Cretan Lute'))
+        self._add_menu_button(examples_menu, "Cretan Lute", "Example analysis of Cretan Lute audio",
+                             lambda: self.initialize_frame('Cretan Lute'))
 
+        # Options menu
         options_menu = menubar.addMenu("Options")
-        options_menu.addAction("Spectrogram", lambda: self.initialize_frame('Spectrogram'))
+        self._add_menu_button(options_menu, "Spectrogram", "Configure spectrogram display settings",
+                             lambda: self.initialize_frame('Spectrogram'))
+
+    def _add_menu_button(self, menu, text, tooltip, callback):
+        """Helper method to create a button-like menu item with tooltip"""
+        action = QWidgetAction(menu)
+        button = QToolButton()
+        button.setText(text)
+        button.setToolTip(tooltip)
+        button.setCursor(Qt.PointingHandCursor)
+
+        # ONLY CHANGE THE FONT SIZE - keep other styling original
+        font = button.font()
+        font.setPointSize(15)  # Adjust this value as needed (default is usually 9-10)
+        button.setFont(font)
+
+        button.setStyleSheet("""
+            QToolButton {
+                background-color: transparent;
+                color: white;
+                border: none;
+                padding: 0.75em 1.5em;
+                text-align: left;
+                min-width: 12em;
+                min-height: 2.25em;
+                font-size: 1.1em;
+            }
+            QToolButton:hover {
+                background-color: #3498db;
+                border-radius: 0.2em;
+            }
+        """)
+        button.clicked.connect(callback)
+        action.setDefaultWidget(button)
+        menu.addAction(action)
+        return action
 
     def show_separator_tool(self):
         """Show the separator tool in a new window"""
