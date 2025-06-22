@@ -17,7 +17,7 @@ from matplotlib.widgets import SpanSelector, Button
 from controlMenu import ControlMenu
 
 
-class Record(QWidget):  # Changed from QDialog to QWidget
+class Record(QWidget):
     def __init__(self, master, controller):
         super().__init__(master)
         self.controller = controller
@@ -34,76 +34,147 @@ class Record(QWidget):  # Changed from QDialog to QWidget
         self.setWindowTitle("Audio Recorder")
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         
+        # Main layout with minimal margins
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(5)
         
-        # Recording controls
-        control_layout = QHBoxLayout()
+        # Top control row - everything in one line
+        control_row = QHBoxLayout()
+        control_row.setContentsMargins(0, 0, 0, 0)
+        control_row.setSpacing(10)
         
-        self.record_button = QPushButton("⏺")
-        self.record_button.setFont(QFont("Arial", 30, QFont.Bold))
+        # Record button (red)
+        self.record_button = QPushButton("⏺ Record")
+        self.record_button.setFont(QFont("Arial", 12, QFont.Bold))
+        self.record_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ff4444;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #ff6666;
+            }
+            QPushButton:disabled {
+                background-color: #aa3333;
+            }
+        """)
         self.record_button.clicked.connect(self.start_recording)
         
-        self.stop_button = QPushButton("⏹")
-        self.stop_button.setFont(QFont("Arial", 30, QFont.Bold))
+        # Stop button (neutral color)
+        self.stop_button = QPushButton("⏹ Stop")
+        self.stop_button.setFont(QFont("Arial", 12, QFont.Bold))
+        self.stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #666666;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #888888;
+            }
+            QPushButton:disabled {
+                background-color: #444444;
+            }
+        """)
         self.stop_button.clicked.connect(self.stop_recording)
         self.stop_button.setEnabled(False)
         
-        # Max record time control
-        time_limit_layout = QHBoxLayout()
-        time_limit_label = QLabel("Max record time (s):")
-        self.time_spinbox = QSpinBox()
-        self.time_spinbox.setRange(1, 600)  # 1 to 600 seconds
-        self.time_spinbox.setValue(30)      # Default to 30 seconds
-        self.time_spinbox.setSuffix(" s")
-
-        time_limit_layout.addWidget(time_limit_label)
-        time_limit_layout.addWidget(self.time_spinbox)
-        time_limit_layout.addStretch()
-
-        main_layout.addLayout(time_limit_layout)
-
-        self.help_button = QPushButton("🛈")
-        self.help_button.setFixedWidth(40)
-        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(7))
-        
-        control_layout.addWidget(self.record_button)
-        control_layout.addWidget(self.stop_button)
-        control_layout.addStretch()
-        control_layout.addWidget(self.help_button)
-        
+        # Time display
         self.time_label = QLabel("00:00")
+        self.time_label.setFont(QFont("Arial", 16, QFont.Bold))
         self.time_label.setAlignment(Qt.AlignCenter)
-        self.time_label.setFont(QFont("", 30))
+        self.time_label.setStyleSheet("min-width: 80px;")
         
+        # Max record time dropdown
+        time_limit_layout = QHBoxLayout()
+        time_limit_layout.setSpacing(5)
+        time_limit_label = QLabel("Max:")
+        time_limit_label.setFont(QFont("Arial", 10))
+        self.time_spinbox = QSpinBox()
+        self.time_spinbox.setRange(1, 600)
+        self.time_spinbox.setValue(30)
+        self.time_spinbox.setSuffix("s")
+        self.time_spinbox.setFixedWidth(80)
+        
+        # Enlarged Help Button
+        self.help_button = QPushButton("🛈 Help")
+        self.help_button.setFont(QFont("Arial", 18))  # Increased from 10 to 12
+        self.help_button.setFixedWidth(120)  # Increased from 70 to 90
+        self.help_button.setFixedHeight(35)  # Added fixed height
+        self.help_button.clicked.connect(lambda: self.controller.help.createHelpMenu(7))
+        self.help_button.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #777777;
+            }
+        """)
+        
+        # Enlarged Load Button
+        self.load_button = QPushButton("Load to Controller")
+        self.load_button.setFont(QFont("Arial", 15))  # Increased from 10 to 12
+        self.load_button.setFixedHeight(35)  # Added fixed height
+        self.load_button.setVisible(False)
+        self.load_button.clicked.connect(self.load_to_controller)
+        self.load_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4477ff;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #6699ff;
+            }
+        """)
+        
+        # Add widgets to control row
+        control_row.addWidget(self.record_button)
+        control_row.addWidget(self.stop_button)
+        control_row.addWidget(self.time_label)
+        control_row.addWidget(time_limit_label)
+        control_row.addWidget(self.time_spinbox)
+        control_row.addWidget(self.help_button)
+        control_row.addWidget(self.load_button)
+        control_row.addStretch()
+        
+        # Timer setup
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_time_display)
-
-        self.auto_stop_timer = QTimer(self)  # NEW: Auto stop timer
+        self.auto_stop_timer = QTimer(self)
         self.auto_stop_timer.setSingleShot(True)
         self.auto_stop_timer.timeout.connect(self.stop_recording)
         
+        # Plot area
         self.fig = Figure(figsize=(8, 4))
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
-
-        self.load_button = QPushButton("Load to controller")
-        self.load_button.setVisible(False)
-        self.load_button.clicked.connect(self.load_to_controller)
-        main_layout.addWidget(self.load_button)
-
-
         self.toolbar = NavigationToolbar(self.canvas, self)
-        
         self.canvas.setVisible(False)
         self.toolbar.setVisible(False)
         
-        main_layout.addLayout(control_layout)
-        main_layout.addWidget(self.time_label)
+        # Add everything to main layout
+        main_layout.addLayout(control_row)
         main_layout.addWidget(self.toolbar)
         main_layout.addWidget(self.canvas)
         
         self.setLayout(main_layout)
+
         
     def start_recording(self):
         self.record_button.setEnabled(False)
