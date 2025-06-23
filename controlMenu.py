@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
+from PyQt5.QtWidgets import (QWidget, QSpinBox, QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
 from PyQt5.QtCore import Qt, QTimer
 import matplotlib.pyplot as plt
@@ -66,7 +66,7 @@ class ControlMenu(QDialog):
         main_layout = QGridLayout()
         main_layout.setVerticalSpacing(8)
         main_layout.setHorizontalSpacing(10)
-        
+
         self.method_selector = QComboBox()
         self.method_selector.addItems([
             'FT', 'STFT', 'Spectrogram', 'STFT + Spect', 
@@ -86,7 +86,7 @@ class ControlMenu(QDialog):
         main_layout.addWidget(self.filter_response_button, 8, 2, 1, 2)
         
         self.create_ste_group(main_layout)
-        
+
         self.plot_button = QPushButton('Plot')
         self.plot_button.clicked.connect(self.plot_figure)
         main_layout.addWidget(self.plot_button, 14, 3, 1, 1)
@@ -95,9 +95,30 @@ class ControlMenu(QDialog):
         self.help_button.setFixedWidth(30)
         self.help_button.clicked.connect(self.show_help)
         main_layout.addWidget(self.help_button, 14, 2, 1, 1, Qt.AlignRight)
+
+
+        # Font size controls - NEW POSITION
+        font_layout = QHBoxLayout()
+        font_label = QLabel("Font Size:")
+        self.font_spin = QSpinBox()
+        self.font_spin.setRange(8, 24)
+        self.font_spin.setValue(12)
+        self.font_spin.valueChanged.connect(self.update_font_setting)
+        font_layout.addWidget(font_label)
+        font_layout.addWidget(self.font_spin)
+        
+        # Add font controls to the right of help button
+        font_container = QWidget()
+        font_container.setLayout(font_layout)
+        main_layout.addWidget(font_container, 14, 1, 1, 1, Qt.AlignRight)
+        
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
+
+    def update_font_setting(self, size):
+        """Update the global font setting"""
+        self.current_font_size = size
 
     def play_from_current_position(self):
         """Stream audio from the current position using a low-latency callback."""
@@ -768,6 +789,13 @@ class ControlMenu(QDialog):
     # FT
 
     def plot_ft(self):
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle('Fourier Transform')
 
@@ -777,6 +805,7 @@ class ControlMenu(QDialog):
 
         ax[0].plot(self.time, self.audio)
         ax[0].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
+        ax[0].tick_params(axis='both', labelsize=fontsize*0.9)  # Slightly smaller ticks
 
         min_freq, max_freq = self.get_freq_bounds()
         ax[1].plot(freqs, 20*np.log10(abs(fft)))
@@ -1192,6 +1221,11 @@ class ControlMenu(QDialog):
 
         # Track open windows
         self.plot_windows.append(plot_dialog)
+
+        # Debug print
+        print(f"Total plot windows: {len(self.plot_windows)}")
+        for i, window in enumerate(self.plot_windows):
+            print(f"Window {i+1} title: {window.windowTitle()}")
 
         plot_dialog.show()
         return plot_dialog
@@ -1981,6 +2015,11 @@ class ControlMenu(QDialog):
             self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
 
         self.plot_windows.append(plot_dialog)
+        # Debug print
+        print(f"Total plot windows: {len(self.plot_windows)}")
+        for i, window in enumerate(self.plot_windows):
+            print(f"Window {i+1} title: {window.windowTitle()}")
+
         plot_dialog.show()
         return plot_dialog
 
