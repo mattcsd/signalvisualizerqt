@@ -91,15 +91,15 @@ class ControlMenu(QDialog):
         self.plot_button.clicked.connect(self.plot_figure)
         main_layout.addWidget(self.plot_button, 14, 3, 1, 1)
      
-        self.help_button = QPushButton('🛈')
-        self.help_button.setFixedWidth(30)
+        self.help_button = QPushButton('🛈 Help')
+        self.help_button.setFixedWidth(150)
         self.help_button.clicked.connect(self.show_help)
         main_layout.addWidget(self.help_button, 14, 2, 1, 1, Qt.AlignRight)
 
 
         # Font size controls - NEW POSITION
         font_layout = QHBoxLayout()
-        font_label = QLabel("Font Size:")
+        font_label = QLabel("Font Size(in plots):")
         self.font_spin = QSpinBox()
         self.font_spin.setRange(8, 24)
         self.font_spin.setValue(12)
@@ -819,6 +819,13 @@ class ControlMenu(QDialog):
     def plot_stft(self):
         """STFT with proper array dimension handling"""
         try:
+            # Get current font size (default to 12 if not set)
+            fontsize = getattr(self, 'current_font_size', 12)
+            
+            # Set style before creating figure
+            plt.style.use('default')
+            plt.rcParams.update({'font.size': fontsize})
+
             wind_size = float(self.window_size.text())
             nfft = int(self.nfft.currentText())
 
@@ -960,6 +967,14 @@ class ControlMenu(QDialog):
             return np.full(dummy_length, np.nan), np.full(dummy_length, np.nan)
 
     def plot_pitch(self):
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
+
         method = self.pitch_method.currentText()
         min_pitch = float(self.min_pitch.text())
         max_pitch = float(self.max_pitch.text())
@@ -1069,6 +1084,13 @@ class ControlMenu(QDialog):
 
     def plot_spectrogram(self):
         try:
+            # Get current font size (default to 12 if not set)
+            fontsize = getattr(self, 'current_font_size', 12)
+            
+            # Set style before creating figure
+            plt.style.use('default')
+            plt.rcParams.update({'font.size': fontsize})
+
             # Validate parameters and get calculated values
             params = self.validate_spectrogram_parameters()
 
@@ -1234,6 +1256,14 @@ class ControlMenu(QDialog):
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
         try:
+
+            # Get current font size (default to 12 if not set)
+            fontsize = getattr(self, 'current_font_size', 12)
+            
+            # Set style before creating figure
+            plt.style.use('default')
+            plt.rcParams.update({'font.size': fontsize})
+
             wind_size = float(self.window_size.text())
             overlap = float(self.overlap.text())
             nfft = int(self.nfft.currentText())
@@ -1409,6 +1439,14 @@ class ControlMenu(QDialog):
     # Short Time Energy
 
     def plot_ste(self):
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
+
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
         window_type = self.window_type.currentText()
@@ -1459,6 +1497,14 @@ class ControlMenu(QDialog):
     # Spectral Centroid
 
     def plot_spectral_centroid(self):
+
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
         nfft = int(self.nfft.currentText())
@@ -1588,6 +1634,14 @@ class ControlMenu(QDialog):
 
     def plot_filtered_waveform(self, filter_type, filtered_signal):
         """Plot original and filtered waveforms with proper span selectors in same window"""
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
+
         self.current_figure, ax = plt.subplots(2, figsize=(12, 6))
         self.current_figure.suptitle(f'Filtered Signal ({filter_type}) - Waveform')
 
@@ -1613,6 +1667,13 @@ class ControlMenu(QDialog):
     def plot_filtered_spectrogram(self, filter_type, filtered_signal):
         """Plot original and filtered spectrograms in shared window with independent span selectors."""
         try:
+            # Get current font size (default to 12 if not set)
+            fontsize = getattr(self, 'current_font_size', 12)
+            
+            # Set style before creating figure
+            plt.style.use('default')
+            plt.rcParams.update({'font.size': fontsize})
+
             # --- PARAMETERS ---
             params = self.validate_spectrogram_parameters()
             wind_size_samples = params['wind_size_samples']

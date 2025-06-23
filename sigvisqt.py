@@ -193,7 +193,25 @@ class Start(QMainWindow):
                 font-size: 18pt;
                 opacity: 230;
             }
+            /* Submenu items - make them match main menu height */
+            QMenu::item {
+                padding: 0.75em 1.5em;  /* Increased vertical padding */
+                min-height: 2.25em;      /* Explicit minimum height */
+            }
+            
+            /* Submenu indicators */
+            QMenu::indicator {
+                width: 1em;
+                height: 1em;
+            }
+            
+            /* Submenu itself */
+            QMenu::menu {
+                margin: 0.25em;  /* Slight margin around submenu */
+            }
         """)
+
+
         # Signal Visualizer menu
         signal_menu = menubar.addMenu("Signal Visualizer")
         self._add_menu_button(signal_menu, "Info", "Show application information and instructions", 
