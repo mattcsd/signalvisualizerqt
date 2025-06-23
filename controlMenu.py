@@ -1977,37 +1977,50 @@ class ControlMenu(QDialog):
         plot_dialog.setLayout(layout)
 
         def handle_close():
+            # Stream cleanup
             if hasattr(plot_dialog, 'active_stream') and plot_dialog.active_stream is not None:
                 try:
                     plot_dialog.active_stream.stop()
                     plot_dialog.active_stream.close()
                 except Exception as e:
                     print(f"Error stopping stream: {e}")
-                plot_dialog.active_stream = None
+                finally:
+                    plot_dialog.active_stream = None
 
+            # Timer cleanup - safer disconnection
             if hasattr(plot_dialog, 'cursor_timer') and plot_dialog.cursor_timer is not None:
                 try:
                     plot_dialog.cursor_timer.stop()
-                    plot_dialog.cursor_timer.timeout.disconnect()
+                    # Only disconnect if connected
+                    if plot_dialog.cursor_timer.receivers(plot_dialog.cursor_timer.timeout) > 0:
+                        plot_dialog.cursor_timer.timeout.disconnect()
                 except Exception as e:
                     print(f"Error stopping timer: {e}")
+                finally:
+                    plot_dialog.cursor_timer = None
 
+            # Visual elements cleanup
             for cursor_attr in ['cursor_line', 'spectrogram_cursor_line', 'visible_span_patch']:
                 if hasattr(plot_dialog, cursor_attr) and getattr(plot_dialog, cursor_attr) is not None:
                     try:
                         getattr(plot_dialog, cursor_attr).remove()
                     except Exception as e:
                         print(f"Error removing {cursor_attr}: {e}")
+                    finally:
+                        setattr(plot_dialog, cursor_attr, None)
 
-            if plot_dialog.plot_id in getattr(self, 'span_selectors', {}):
-                for selector in self.span_selectors[plot_dialog.plot_id]:
-                    try:
-                        selector.disconnect_events()
-                    except Exception as e:
-                        print(f"Error disconnecting selector: {e}")
-                del self.span_selectors[plot_dialog.plot_id]
-
+            # Clean up selectors through the main window
             self.on_plot_window_close(plot_dialog.plot_id)
+            
+            # Remove from windows list if it exists
+            if hasattr(self, 'plot_windows') and plot_dialog in self.plot_windows:
+                print(f"Removing a window total plot windows: {len(self.plot_windows)}")
+                self.plot_windows.remove(plot_dialog)
+                # Debug print
+                print(f"Removed: Total plot windows: {len(self.plot_windows)}")
+                for i, window in enumerate(self.plot_windows):
+                    print(f"Window {i+1} title: {window.windowTitle()}")
+
                     
         plot_dialog.finished.connect(handle_close)
 
@@ -2025,26 +2038,33 @@ class ControlMenu(QDialog):
 
 
     def on_plot_window_close(self, plot_id):
-        """Handle plot window closure"""
+        """Centralized cleanup for plot windows"""
         # Stop live analysis if active
         if hasattr(self, 'live_timer') and self.live_timer.isActive():
             self.stop_live_analysis()
         
-        # Clean up span selectors
-        if plot_id in self.span_selectors:
-            for selector in self.span_selectors[plot_id]:
-                try:
-                    selector.disconnect_events()
-                except:
-                    pass
-            del self.span_selectors[plot_id]
+        # Clean up span selectors - more defensive
+        if hasattr(self, 'span_selectors'):
+            if plot_id in self.span_selectors:
+                for selector in self.span_selectors[plot_id]:
+                    try:
+                        if hasattr(selector, 'disconnect_events'):
+                            selector.disconnect_events()
+                        elif hasattr(selector, 'set_active'):
+                            selector.set_active(False)  # Alternative cleanup
+                    except Exception as e:
+                        print(f"Selector cleanup error: {e}")
+                self.span_selectors.pop(plot_id, None)
         
-        # Remove window reference
-        self.plot_windows = [w for w in self.plot_windows if getattr(w, 'plot_id', None) != plot_id]
-        
-        # Clear current figure if it's the one being closed
+        # Clear current figure reference if it matches
         if hasattr(self, 'current_figure') and id(self.current_figure) == plot_id:
-            del self.current_figure
+            try:
+                import matplotlib.pyplot as plt
+                plt.close(self.current_figure)
+            except:
+                pass
+            finally:
+                del self.current_figure
 
     def get_window(self, size):
         window_type = self.window_type.currentText()
