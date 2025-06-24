@@ -3,7 +3,7 @@ import pyaudio
 from scipy.fft import fft
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (QPushButton, QCheckBox, QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
+from PyQt5.QtWidgets import (QMessageBox, QPushButton, QCheckBox, QWidget, QSlider, QVBoxLayout, QComboBox, QLabel, 
                             QHBoxLayout, QSizePolicy)
 from PyQt5.QtCore import QTimer, Qt
 import matplotlib.pyplot as plt
@@ -21,8 +21,20 @@ class AudioFFTVisualizer(QWidget):
         self.frequency_range = (20, 20000)  # Human hearing range
         
         # Initialize PyAudio and get devices
-        self.p = pyaudio.PyAudio()
-        self.input_devices = self.get_input_devices()
+        try:
+            self.p = pyaudio.PyAudio()
+            self.input_devices = self.get_input_devices()
+            self.has_audio_input = len(self.input_devices) > 0
+        except Exception as e:
+            print(f"Error initializing audio: {e}")
+            self.has_audio_input = False
+            self.show_no_microphone_warning()
+        
+        # Only proceed if we have audio input devices
+        if not self.has_audio_input:
+            self.setup_ui_disabled()
+            return
+            
         self.current_device_index = None  # Will be set when starting stream
 
         # Visualization parameters
@@ -64,17 +76,41 @@ class AudioFFTVisualizer(QWidget):
         self.timer.timeout.connect(self.update_plot)
         self.timer.start(20)  # Update every 20ms
 
+    def show_no_microphone_warning(self):
+        """Show a warning message when no microphone is available"""
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("No audio input devices found")
+        msg.setInformativeText("The application will run in disabled mode. Please connect a microphone to use audio features.")
+        msg.setWindowTitle("Audio Device Not Found")
+        msg.exec_()
+
+    def setup_ui_disabled(self):
+        """Setup a disabled UI when no microphone is available"""
+        main_layout = QVBoxLayout(self)
+        
+        # Create disabled message
+        disabled_label = QLabel("Audio features disabled - no input devices available")
+        disabled_label.setAlignment(Qt.AlignCenter)
+        disabled_label.setStyleSheet("font-size: 16px; color: #888;")
+        
+        main_layout.addWidget(disabled_label)
+        self.setLayout(main_layout)
+
     def get_input_devices(self):
         """Get list of available input devices with their indices"""
         devices = []
-        for i in range(self.p.get_device_count()):
-            dev = self.p.get_device_info_by_index(i)
-            if dev['maxInputChannels'] > 0:
-                devices.append({
-                    'index': i,
-                    'name': dev['name'],
-                    'channels': dev['maxInputChannels']
-                })
+        try:
+            for i in range(self.p.get_device_count()):
+                dev = self.p.get_device_info_by_index(i)
+                if dev['maxInputChannels'] > 0:
+                    devices.append({
+                        'index': i,
+                        'name': dev['name'],
+                        'channels': dev['maxInputChannels']
+                    })
+        except Exception as e:
+            print(f"Error getting input devices: {e}")
         return devices
 
     def setup_ui(self):
@@ -98,7 +134,6 @@ class AudioFFTVisualizer(QWidget):
         self.instrument_dropdown.addItem("-- Select Instrument --", None)  # Default empty option
         self.instrument_dropdown.addItems(self.instrument_frequencies.keys())
         self.instrument_dropdown.currentTextChanged.connect(self.update_instrument_markers)
-
 
         # Add reset button
         self.reset_button = QPushButton("Reset Values")
@@ -125,7 +160,6 @@ class AudioFFTVisualizer(QWidget):
         self.offset_slider.setRange(-40, 40)  # -40dB to +40dB offset range
         self.offset_slider.setValue(0)        # Default no offset
         self.offset_slider.valueChanged.connect(self.update_plot)
-
 
         # Log/linear frequency scale checkbox
         self.log_freq_checkbox = QCheckBox("Linear Frequency")
@@ -155,6 +189,43 @@ class AudioFFTVisualizer(QWidget):
         
         # Setup plots
         self.setup_plots()
+
+    def start_audio_stream(self, device_index=None):
+        """Start the audio input stream"""
+        if not self.has_audio_input:
+            return
+            
+        if hasattr(self, 'stream'):
+            self.stream.stop_stream()
+            self.stream.close()
+        
+        try:
+            self.stream = self.p.open(
+                format=self.FORMAT,
+                channels=self.CHANNELS,
+                rate=self.RATE,
+                input=True,
+                output=False,
+                frames_per_buffer=self.CHUNK,
+                input_device_index=device_index,
+                stream_callback=self.audio_callback
+            )
+            self.current_device_index = device_index
+            print(f"Stream started with device index: {device_index if device_index else 'default'}")
+        except Exception as e:
+            print(f"Error opening stream: {e}")
+            self.show_stream_error_message(str(e))
+
+    def show_stream_error_message(self, error_details):
+        """Show an error message when stream fails to open"""
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText("Failed to open audio stream")
+        msg.setInformativeText(f"Error details: {error_details}")
+        msg.setWindowTitle("Audio Stream Error")
+        msg.exec_()
+
+
 
     def reset_values(self):
         """Reset all controls to default values"""
@@ -363,10 +434,11 @@ class AudioFFTVisualizer(QWidget):
 
     def cleanup(self):
         self.running = False
-        if hasattr(self, 'stream'):
-            self.stream.stop_stream()
-            self.stream.close()
-        self.p.terminate()
+        if self.has_audio_input:
+            if hasattr(self, 'stream'):
+                self.stream.stop_stream()
+                self.stream.close()
+            self.p.terminate()
 
 
     def update_plot(self):
