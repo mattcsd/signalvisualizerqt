@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QToolButton, QWidgetAction, QHBoxLayout, QAction, QApplication, QMenuBar, QMenu, QMainWindow, QWidget, QVBoxLayout, QMenuBar, QMenu, QAction, QMessageBox, QDesktopWidget
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QFont
 
 from info import Info
 from help import Help
@@ -250,29 +250,25 @@ class Start(QMainWindow):
         tuner_menu = menubar.addMenu("Tuner")
         self._add_menu_button(tuner_menu, "Live STFT", "Real-time frequency analysis for tuning instruments",
                              lambda: self.initialize_frame('Tuner'))
-
+        '''
         # Tools menu
         tools_menu = menubar.addMenu("Tools")
         self._add_menu_button(tools_menu, "Fundamental/Harmonics Separator",
                             "Separate fundamental frequency from harmonics",
                             lambda: self.show_separator_tool())
+        '''
 
         # Examples menu
         examples_menu = menubar.addMenu("Examples")
         self._add_menu_button(examples_menu, "Cretan Lute", "Example analysis of Cretan Lute audio",
                              lambda: self.initialize_frame('Cretan Lute'))
 
-        # Add new "Windows" menu
-        windows_menu = menubar.addMenu("Windows")
+        # Open windows menu
+        windows_menu = menubar.addMenu("Open windows")
         
         # Create submenus
         self.control_windows_menu = windows_menu.addMenu("Control Windows")
         self.plot_windows_menu = windows_menu.addMenu("Plot Windows")
-        
-        # Add refresh action
-        refresh_action = QAction("Refresh Window List", self)
-        refresh_action.triggered.connect(self.update_windows_menu)
-        windows_menu.addAction(refresh_action)
         
         # Connect to aboutToShow to auto-update
         windows_menu.aboutToShow.connect(self.update_windows_menu)
@@ -301,15 +297,28 @@ class Start(QMainWindow):
             action.triggered.connect(lambda _, w=window: self.focus_window(w))
             self.control_windows_menu.addAction(action)
             
-        # Add plot windows from all control windows
+        # Add plot windows with grouping
         plot_count = 1
         for ctrl_window in control_windows:
-            for plot_window in ctrl_window.plot_windows:
-                action = QAction(f"{plot_count}. {plot_window.windowTitle()} "
-                               f"(from {ctrl_window.windowTitle()})", self)
-                action.triggered.connect(lambda _, w=plot_window: self.focus_window(w))
-                self.plot_windows_menu.addAction(action)
-                plot_count += 1
+            # Only add group if there are plot windows for this control window
+            if ctrl_window.plot_windows:
+                # Add separator with control window title (except before first group)
+                if plot_count > 1:
+                    self.plot_windows_menu.addSeparator()
+                
+                # Add clickable header for the control window
+                header = QAction(f"📌 {ctrl_window.windowTitle()}", self)
+                # Make it look slightly different (bold would be nice but Qt doesn't support it easily)
+                header.setFont(QFont("Arial", weight=QFont.Bold))
+                header.triggered.connect(lambda _, w=ctrl_window: self.focus_window(w))
+                self.plot_windows_menu.addAction(header)
+                
+                # Add plot windows for this control window
+                for plot_window in ctrl_window.plot_windows:
+                    action = QAction(f"    {plot_count}. {plot_window.windowTitle()}", self)
+                    action.triggered.connect(lambda _, w=plot_window: self.focus_window(w))
+                    self.plot_windows_menu.addAction(action)
+                    plot_count += 1
                 
     def focus_window(self, window):
         """Bring a window to focus"""

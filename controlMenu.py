@@ -672,8 +672,6 @@ class ControlMenu(QDialog):
         
         self.filter_response_button.setEnabled(filtering_enabled)
 
-    
-
     def get_freq_bounds(self):
         try:
             min_freq = float(self.min_freq.text())
