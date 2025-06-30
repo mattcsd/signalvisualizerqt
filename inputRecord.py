@@ -28,6 +28,9 @@ class Record(QWidget):
         self.recording_start_time = 0
         self.frames = []
         
+        # Track control windows created from recordings
+        self.control_windows = []
+        
         self.setupUI()
         
     def setupUI(self):
@@ -264,28 +267,24 @@ class Record(QWidget):
                 audio_to_load, _ = sf.read("wav/recording.wav", dtype='float32')
             
             duration = len(audio_to_load) / self.fs
-            title = "Recording"
-
-            # Fallback if controller isn't properly initialized
-            if not hasattr(self.controller, 'adse'):
-                from PyQt5.QtWidgets import QWidget
-                self.controller = QWidget()
-                self.controller.adse = type('', (), {})()
-                self.controller.adse.advancedSettings = lambda: print("Advanced settings not available")
+            title = f"Recording {time.strftime('%Y-%m-%d %H:%M')}"
 
             # Create ControlMenu window
             control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
-
-            # Track open windows
-            if not hasattr(self, 'control_windows'):
-                self.control_windows = []
             self.control_windows.append(control_window)
 
             # Clean up when window is closed
-            control_window.destroyed.connect(
-                lambda: self.control_windows.remove(control_window)
-                if control_window in self.control_windows else None
-            )
+            def handle_close():
+                if control_window in self.control_windows:
+                    self.control_windows.remove(control_window)
+                if hasattr(self.controller, 'update_windows_menu'):
+                    self.controller.update_windows_menu()
+            
+            control_window.destroyed.connect(handle_close)
+            
+            # Update windows menu
+            if hasattr(self.controller, 'update_windows_menu'):
+                self.controller.update_windows_menu()
 
             control_window.show()
             control_window.activateWindow()
@@ -294,7 +293,7 @@ class Record(QWidget):
             print(f"Error loading to controller: {e}")
             QMessageBox.critical(self, "Error", f"Could not load to controller:\n{str(e)}")
 
-
+            
     def setup_span_selector(self, time_axis, audio):
         if hasattr(self, 'span'):
             self.span.disconnect_events()

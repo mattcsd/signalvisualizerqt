@@ -286,14 +286,27 @@ class Start(QMainWindow):
         self.control_windows_menu.clear()
         self.plot_windows_menu.clear()
         
-        # Get control windows from Load frame if it exists
+        # Collect control windows from all sources
         control_windows = []
+        
+        # Get control windows from Load frame if it exists
         if 'Load' in self.frames:
-            control_windows = self.frames['Load'].control_windows
-            
-        # Add control windows
+            control_windows.extend(self.frames['Load'].control_windows)
+        
+        # Get control windows from Record frame if it exists
+        if 'Record' in self.frames and hasattr(self.frames['Record'], 'control_windows'):
+            control_windows.extend(self.frames['Record'].control_windows)
+        
+        # Add control windows with source indication
         for i, window in enumerate(control_windows, 1):
-            action = QAction(f"{i}. {window.windowTitle()}", self)
+            # Determine source based on window title
+            title = window.windowTitle()
+            if "Recording" in title:
+                icon = "🎙️"  # Microphone for recordings
+            else:
+                icon = "📁"   # Folder for loaded files
+            
+            action = QAction(f"{i}. {icon} {title}", self)
             action.triggered.connect(lambda _, w=window: self.focus_window(w))
             self.control_windows_menu.addAction(action)
             
@@ -301,14 +314,20 @@ class Start(QMainWindow):
         plot_count = 1
         for ctrl_window in control_windows:
             # Only add group if there are plot windows for this control window
-            if ctrl_window.plot_windows:
+            if hasattr(ctrl_window, 'plot_windows') and ctrl_window.plot_windows:
                 # Add separator with control window title (except before first group)
                 if plot_count > 1:
                     self.plot_windows_menu.addSeparator()
                 
+                # Determine source icon for header
+                title = ctrl_window.windowTitle()
+                if "Recording" in title:
+                    icon = "🎙️"
+                else:
+                    icon = "📁"
+                
                 # Add clickable header for the control window
-                header = QAction(f"📌 {ctrl_window.windowTitle()}", self)
-                # Make it look slightly different (bold would be nice but Qt doesn't support it easily)
+                header = QAction(f"📌 {icon} {title}", self)
                 header.setFont(QFont("Arial", weight=QFont.Bold))
                 header.triggered.connect(lambda _, w=ctrl_window: self.focus_window(w))
                 self.plot_windows_menu.addAction(header)
@@ -319,6 +338,7 @@ class Start(QMainWindow):
                     action.triggered.connect(lambda _, w=plot_window: self.focus_window(w))
                     self.plot_windows_menu.addAction(action)
                     plot_count += 1
+
                 
     def focus_window(self, window):
         """Bring a window to focus"""
