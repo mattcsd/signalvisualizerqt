@@ -40,6 +40,7 @@ class ControlMenu(QDialog):
 
         self.plot_windows = []  # Track plot windows
         self.span_selectors = {}  # Track span selectors by window ID
+        self.controller = controller
         
         # CRITICAL SETTINGS (add these):
         self.setWindowTitle(self.base_name)  # Use the provided title
@@ -2098,6 +2099,9 @@ class ControlMenu(QDialog):
                 finally:
                     plot_dialog.cursor_timer = None
 
+            if hasattr(self.controller, 'update_windows_menu'):
+                self.controller.update_windows_menu()
+
             # Visual elements cleanup
             for cursor_attr in ['cursor_line', 'spectrogram_cursor_line', 'visible_span_patch']:
                 if hasattr(plot_dialog, cursor_attr) and getattr(plot_dialog, cursor_attr) is not None:
@@ -2127,6 +2131,8 @@ class ControlMenu(QDialog):
             self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
 
         self.plot_windows.append(plot_dialog)
+        if hasattr(self.controller, 'update_windows_menu'):
+            self.controller.update_windows_menu()
         # Debug print
         print(f"Total plot windows: {len(self.plot_windows)}")
         for i, window in enumerate(self.plot_windows):

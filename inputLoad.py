@@ -30,6 +30,8 @@ class Load(QWidget):
         self.control_windows = []  # List to track all open control windows
         self.selected_span = (0, 0)  # Track selected time span
         
+        self.controller = controller  # This should reference your Start instance
+
         self.setupUI()
         
     def setupUI(self):
@@ -168,7 +170,6 @@ class Load(QWidget):
         seconds = seconds % 60
         return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Shows mm:ss.xx
 
-
     def addLoadButton(self):
         # Remove existing button if it exists
         if hasattr(self, 'load_button_ax'):
@@ -202,6 +203,9 @@ class Load(QWidget):
             # Create new control window
             control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
             
+            if hasattr(self.controller, 'update_windows_menu'):
+                self.controller.update_windows_menu()
+                
             # Store the title early since windowTitle() may fail later
             window_title = control_window.windowTitle()
             

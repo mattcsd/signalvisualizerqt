@@ -54,6 +54,11 @@ class Start(QMainWindow):
 
         # Dictionary to hold frames
         self.frames = {}
+
+        self.all_open_windows = {
+            'control_menus': [],  # Will reference Load's control_windows
+            'plot_windows': []    # Will reference ControlMenu's plot_windows
+        }
         
         # Initialize and show Info frame by default
         self.initialize_frame('Info')
@@ -128,7 +133,6 @@ class Start(QMainWindow):
             # Add the new frame to the layout
             self.layout.addWidget(self.frames[page_name])
             self.frames[page_name].setVisible(True)
-
 
     def create_menu_bar(self):
         """Create the menu bar with button-style dropdown items that support tooltips"""
@@ -258,10 +262,60 @@ class Start(QMainWindow):
         self._add_menu_button(examples_menu, "Cretan Lute", "Example analysis of Cretan Lute audio",
                              lambda: self.initialize_frame('Cretan Lute'))
 
+        # Add new "Windows" menu
+        windows_menu = menubar.addMenu("Windows")
+        
+        # Create submenus
+        self.control_windows_menu = windows_menu.addMenu("Control Windows")
+        self.plot_windows_menu = windows_menu.addMenu("Plot Windows")
+        
+        # Add refresh action
+        refresh_action = QAction("Refresh Window List", self)
+        refresh_action.triggered.connect(self.update_windows_menu)
+        windows_menu.addAction(refresh_action)
+        
+        # Connect to aboutToShow to auto-update
+        windows_menu.aboutToShow.connect(self.update_windows_menu)
+
+
         # Options menu
         options_menu = menubar.addMenu("Options")
         self._add_menu_button(options_menu, "Spectrogram", "Configure spectrogram display settings",
                              lambda: self.initialize_frame('Spectrogram'))
+
+
+    def update_windows_menu(self):
+        """Update the windows menu with current open windows"""
+        # Clear existing menus
+        self.control_windows_menu.clear()
+        self.plot_windows_menu.clear()
+        
+        # Get control windows from Load frame if it exists
+        control_windows = []
+        if 'Load' in self.frames:
+            control_windows = self.frames['Load'].control_windows
+            
+        # Add control windows
+        for i, window in enumerate(control_windows, 1):
+            action = QAction(f"{i}. {window.windowTitle()}", self)
+            action.triggered.connect(lambda _, w=window: self.focus_window(w))
+            self.control_windows_menu.addAction(action)
+            
+        # Add plot windows from all control windows
+        plot_count = 1
+        for ctrl_window in control_windows:
+            for plot_window in ctrl_window.plot_windows:
+                action = QAction(f"{plot_count}. {plot_window.windowTitle()} "
+                               f"(from {ctrl_window.windowTitle()})", self)
+                action.triggered.connect(lambda _, w=plot_window: self.focus_window(w))
+                self.plot_windows_menu.addAction(action)
+                plot_count += 1
+                
+    def focus_window(self, window):
+        """Bring a window to focus"""
+        if window:
+            window.raise_()
+            window.activateWindow()
 
     def _add_menu_button(self, menu, text, tooltip, callback):
         """Helper method to create a button-like menu item with tooltip"""
