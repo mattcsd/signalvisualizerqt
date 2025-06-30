@@ -173,27 +173,27 @@ class ControlMenu(QDialog):
             if self.stream_pos >= total_length:
                 raise sd.CallbackStop()
 
-        try:
-            self.active_stream = sd.OutputStream(
-                samplerate=self.fs,
-                channels=1,
-                dtype='float32',
-                callback=callback,
-                blocksize=4096,
-            )
-            self.active_stream.start()
-            self.is_playing = True
-            self.playback_start_time = time.time()
-            self.playback_start_sample = self.stream_pos
+            try:
+                self.active_stream = sd.OutputStream(
+                    samplerate=self.fs,
+                    channels=1,
+                    dtype='float32',
+                    callback=callback,
+                    blocksize=4096,
+                )
+                self.active_stream.start()
+                self.is_playing = True
+                self.playback_start_time = time.time()
+                self.playback_start_sample = self.stream_pos
 
-            # Start visualization timer
-            if not hasattr(self, 'playback_timer'):
-                self.playback_timer = QTimer()
-                self.playback_timer.timeout.connect(self.update_playback_position)
-            self.playback_timer.start(5)
+                # Start visualization timer
+                if not hasattr(self, 'playback_timer'):
+                    self.playback_timer = QTimer()
+                    self.playback_timer.timeout.connect(self.update_playback_position)
+                self.playback_timer.start(5)
 
-        except Exception as e:
-            print(f"Audio playback failed: {e}")
+            except Exception as e:
+                print(f"Audio playback failed: {e}")
 
     def show_help(self):
         """Properly shows and activates the help window"""
@@ -338,6 +338,7 @@ class ControlMenu(QDialog):
             self.live_timer.timeout.connect(self.update_live_position)
         
         # Start audio playback
+        print("STARTED PLAYING")
         self.play_from_current_position()
         
         # Start timer
@@ -670,81 +671,7 @@ class ControlMenu(QDialog):
         
         self.filter_response_button.setEnabled(filtering_enabled)
 
-    def plot_filter_response(self):
-            filter_type = self.filter_type.currentText()
-            percentage = float(self.percentage.text())
-            
-            if filter_type == 'Lowpass' or filter_type == 'Highpass':
-                fcut = float(self.fcut.text())
-                delta = fcut * (percentage / 100)
-                
-                if filter_type == 'Lowpass':
-                    wp = fcut - delta
-                    ws = fcut + delta
-                else:
-                    wp = fcut + delta
-                    ws = fcut - delta
-                    
-                N, Wn = signal.ellipord(wp, ws, 3, 40, fs=self.fs)
-                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
-                
-            elif filter_type == 'Harmonic':
-                fund_freq = float(self.fund_freq.text())
-                center_freq = float(self.center_freq.text())
-                fc = fund_freq * center_freq
-                fcut1 = fc - center_freq/2
-                fcut2 = fc + center_freq/2
-                delta1 = fcut1 * (percentage / 100)
-                delta2 = fcut2 * (percentage / 100)
-                
-                wp1 = fcut1 + delta1
-                wp2 = fcut2 - delta2
-                ws1 = fcut1 - delta1
-                ws2 = fcut2 + delta2
-                
-                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
-                b, a = signal.ellip(N, 0.1, 40, Wn, btype='bandpass', fs=self.fs)
-                
-            else:  # Bandpass or Bandstop
-                fcut1 = float(self.fcut1.text())
-                fcut2 = float(self.fcut2.text())
-                delta1 = fcut1 * (percentage / 100)
-                delta2 = fcut2 * (percentage / 100)
-                
-                if filter_type == 'Bandpass':
-                    wp1 = fcut1 + delta1
-                    wp2 = fcut2 - delta2
-                    ws1 = fcut1 - delta1
-                    ws2 = fcut2 + delta2
-                else:
-                    wp1 = fcut1 - delta1
-                    wp2 = fcut2 + delta2
-                    ws1 = fcut1 + delta1
-                    ws2 = fcut2 - delta2
-                    
-                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
-                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
-            
-            w, h = signal.freqz(b, a, worN=8000, fs=self.fs)
-            phase = np.unwrap(np.angle(h))
-            
-            self.current_figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
-            self.current_figure.suptitle(f'Filter Frequency Response ({filter_type})')
-            
-            ax1.plot(w, 20 * np.log10(abs(h)))
-            ax1.set_title('Magnitude Response')
-            ax1.set_ylabel('Amplitude [dB]')
-            ax1.set_xlabel('Frequency [Hz]')
-            ax1.grid(True)
-            
-            ax2.plot(w, phase)
-            ax2.set_title('Phase Response')
-            ax2.set_ylabel('Phase [radians]')
-            ax2.set_xlabel('Frequency [Hz]')
-            ax2.grid(True)
-            
-            plt.tight_layout()
-            plt.show()
+    
 
     def get_freq_bounds(self):
         try:
@@ -1161,8 +1088,6 @@ class ControlMenu(QDialog):
 
 
     # STFT + Spectrogram
-
-
 
 
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
@@ -1632,6 +1557,82 @@ class ControlMenu(QDialog):
 
     # Filtered section.
 
+    def plot_filter_response(self):
+            filter_type = self.filter_type.currentText()
+            percentage = float(self.percentage.text())
+            
+            if filter_type == 'Lowpass' or filter_type == 'Highpass':
+                fcut = float(self.fcut.text())
+                delta = fcut * (percentage / 100)
+                
+                if filter_type == 'Lowpass':
+                    wp = fcut - delta
+                    ws = fcut + delta
+                else:
+                    wp = fcut + delta
+                    ws = fcut - delta
+                    
+                N, Wn = signal.ellipord(wp, ws, 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
+                
+            elif filter_type == 'Harmonic':
+                fund_freq = float(self.fund_freq.text())
+                center_freq = float(self.center_freq.text())
+                fc = fund_freq * center_freq
+                fcut1 = fc - center_freq/2
+                fcut2 = fc + center_freq/2
+                delta1 = fcut1 * (percentage / 100)
+                delta2 = fcut2 * (percentage / 100)
+                
+                wp1 = fcut1 + delta1
+                wp2 = fcut2 - delta2
+                ws1 = fcut1 - delta1
+                ws2 = fcut2 + delta2
+                
+                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype='bandpass', fs=self.fs)
+                
+            else:  # Bandpass or Bandstop
+                fcut1 = float(self.fcut1.text())
+                fcut2 = float(self.fcut2.text())
+                delta1 = fcut1 * (percentage / 100)
+                delta2 = fcut2 * (percentage / 100)
+                
+                if filter_type == 'Bandpass':
+                    wp1 = fcut1 + delta1
+                    wp2 = fcut2 - delta2
+                    ws1 = fcut1 - delta1
+                    ws2 = fcut2 + delta2
+                else:
+                    wp1 = fcut1 - delta1
+                    wp2 = fcut2 + delta2
+                    ws1 = fcut1 + delta1
+                    ws2 = fcut2 - delta2
+                    
+                N, Wn = signal.ellipord([wp1, wp2], [ws1, ws2], 3, 40, fs=self.fs)
+                b, a = signal.ellip(N, 0.1, 40, Wn, btype=filter_type.lower(), fs=self.fs)
+            
+            w, h = signal.freqz(b, a, worN=8000, fs=self.fs)
+            phase = np.unwrap(np.angle(h))
+            
+            self.current_figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+            self.current_figure.suptitle(f'Filter Frequency Response ({filter_type})')
+            
+            ax1.plot(w, 20 * np.log10(abs(h)))
+            ax1.set_title('Magnitude Response')
+            ax1.set_ylabel('Amplitude [dB]')
+            ax1.set_xlabel('Frequency [Hz]')
+            ax1.grid(True)
+            
+            ax2.plot(w, phase)
+            ax2.set_title('Phase Response')
+            ax2.set_ylabel('Phase [radians]')
+            ax2.set_xlabel('Frequency [Hz]')
+            ax2.grid(True)
+            
+            plt.tight_layout()
+            plt.show()
+
     def plot_filtered_waveform(self, filter_type, filtered_signal):
         """Plot original and filtered waveforms with proper span selectors in same window"""
         # Get current font size (default to 12 if not set)
@@ -1750,7 +1751,6 @@ class ControlMenu(QDialog):
             if self.current_figure:
                 plt.close(self.current_figure)
 
-
     def plot_filtering(self):
         filter_type = self.filter_type.currentText()
         percentage = float(self.percentage.text())
@@ -1816,7 +1816,8 @@ class ControlMenu(QDialog):
         else:
             self.plot_filtered_spectrogram(filter_type, filtered_signal)
 
-    # Plot methods
+
+    # Helper plot methods
 
     def create_span_selector(self, ax, audio_signal, plot_dialog, tag='default'):
         def onselect(xmin, xmax):
@@ -1974,12 +1975,6 @@ class ControlMenu(QDialog):
 
         # Store selector using the tag (e.g., 'original', 'filtered')
         self.span_selectors[plot_dialog.plot_id][tag] = span_selector
-
-
-
-
-
-
 
 
     def cleanup_plot_window(self, plot_id):
@@ -2283,7 +2278,6 @@ class ControlMenu(QDialog):
             plot_dialog.cursor_timer.start(30)
         except Exception as e:
             print(f"Playback error: {e}")
-
 
     def on_plot_window_close(self, plot_id):
         """Centralized cleanup for plot windows"""

@@ -202,14 +202,32 @@ class Load(QWidget):
             # Create new control window
             control_window = ControlMenu(title, self.fs, audio_to_load, duration, self.controller)
             
-            # Automatically clean up closed windows
-            control_window.destroyed.connect(
-                lambda: self.control_windows.remove(control_window) 
-                if control_window in self.control_windows else None
-            )
+            # Store the title early since windowTitle() may fail later
+            window_title = control_window.windowTitle()
+            
+            def handle_close():
+                try:
+                    # Check if window still exists in the list
+                    if control_window in self.control_windows:
+                        self.control_windows.remove(control_window)
+                        print(f"Removed window: '{window_title}'. Total windows: {len(self.control_windows)}")
+                        # Print all remaining windows
+                        print("Current windows:", [w.base_name for w in self.control_windows])
+
+                    else:
+                        print(f"Window '{window_title}' not found in control_windows list")
+                except RuntimeError:
+                    # This catches cases where the window is partially destroyed
+                    print(f"Window '{window_title}' already destroyed during cleanup")
+                
+            control_window.destroyed.connect(handle_close)
             
             self.control_windows.append(control_window)
+            print(f"Added window: '{control_window.windowTitle()}'. Total windows: {len(self.control_windows)}")
+            print("All windows:", [w.base_name for w in self.control_windows])            
+            
             control_window.show()
+            
             control_window.activateWindow()
 
         self.load_button.on_clicked(on_load)
