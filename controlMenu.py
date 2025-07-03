@@ -153,48 +153,48 @@ class ControlMenu(QDialog):
         self.stream_data = audio_chunk.astype(np.float32)
         total_length = len(self.stream_data)
 
-        def callback(outdata, frames, time, status):
-            if status:
-                print("Stream status:", status)
+    def callback(outdata, frames, time, status):
+        if status:
+            print("Stream status:", status)
 
-            remaining = total_length - self.stream_pos
-            if remaining <= 0:
-                raise sd.CallbackStop()
+        remaining = total_length - self.stream_pos
+        if remaining <= 0:
+            raise sd.CallbackStop()
 
-            n_frames = min(frames, remaining)
-            chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
+        n_frames = min(frames, remaining)
+        chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
 
-            if n_frames < frames:
-                chunk = np.pad(chunk, (0, frames - n_frames))
+        if n_frames < frames:
+            chunk = np.pad(chunk, (0, frames - n_frames))
 
-            outdata[:, 0] = chunk
-            self.stream_pos += n_frames
-            self.mid_point_idx = self.stream_pos  # <-- live cursor index for update_playback_position()
+        outdata[:, 0] = chunk
+        self.stream_pos += n_frames
+        self.mid_point_idx = self.stream_pos  # <-- live cursor index for update_playback_position()
 
-            if self.stream_pos >= total_length:
-                raise sd.CallbackStop()
+        if self.stream_pos >= total_length:
+            raise sd.CallbackStop()
 
-            try:
-                self.active_stream = sd.OutputStream(
-                    samplerate=self.fs,
-                    channels=1,
-                    dtype='float32',
-                    callback=callback,
-                    blocksize=4096,
-                )
-                self.active_stream.start()
-                self.is_playing = True
-                self.playback_start_time = time.time()
-                self.playback_start_sample = self.stream_pos
+        try:
+            self.active_stream = sd.OutputStream(
+                samplerate=self.fs,
+                channels=1,
+                dtype='float32',
+                callback=callback,
+                blocksize=4096,
+            )
+            self.active_stream.start()
+            self.is_playing = True
+            self.playback_start_time = time.time()
+            self.playback_start_sample = self.stream_pos
 
-                # Start visualization timer
-                if not hasattr(self, 'playback_timer'):
-                    self.playback_timer = QTimer()
-                    self.playback_timer.timeout.connect(self.update_playback_position)
-                self.playback_timer.start(5)
+            # Start visualization timer
+            if not hasattr(self, 'playback_timer'):
+                self.playback_timer = QTimer()
+                self.playback_timer.timeout.connect(self.update_playback_position)
+            self.playback_timer.start(5)
 
-            except Exception as e:
-                print(f"Audio playback failed: {e}")
+        except Exception as e:
+            print(f"Audio playback failed: {e}")
 
     def show_help(self):
         """Properly shows and activates the help window"""
@@ -383,7 +383,7 @@ class ControlMenu(QDialog):
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
         self.stop_audio_playback()  # Ensure previous playback is stopped
-
+        
         self.mid_point_idx = 0
         start_sample = int(self.mid_point_idx)
         audio_segment = self.audio[start_sample:]
