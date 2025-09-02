@@ -46,7 +46,7 @@ class AudioFFTVisualizer(QWidget):
         self.instrument_frequencies = {
             'Guitar (Standard)': [82.41, 110.00, 146.83, 196.00, 246.94, 329.63],  # E2, A2, D3, G3, B3, E4
             'Violin': [196.00, 293.66, 440.00, 659.26],  # G3, D4, A4, E5
-            'Cretan Lute': [82.41, 110.00, 146.83, 196.00],  # E A D G
+            'Cretan Lute': [110.00, 146.83, 196.00, 359],  # E A D G
             'Piano': [27.50, 55.00, 110.00, 220.00, 440.00, 880.00]  # A0-A5
         }
         

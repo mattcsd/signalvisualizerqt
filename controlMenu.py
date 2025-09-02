@@ -42,7 +42,7 @@ class ControlMenu(QDialog):
         self.span_selectors = {}  # Track span selectors by window ID
         self.controller = controller
         
-        # CRITICAL SETTINGS (add these):
+        # CRITICAL SETTINGS:
         self.setWindowTitle(self.base_name)  # Use the provided title
 
         self.setMinimumSize(800, 600)  # Force reasonable size
@@ -70,7 +70,7 @@ class ControlMenu(QDialog):
 
         self.method_selector = QComboBox()
         self.method_selector.addItems([
-            'FT', 'STFT', 'Spectrogram', 'STFT + Spect', 
+            'Waveform', 'Fourier Transform', 'Short Time Fourier Transform', 'Spectrogram', 'STFT + Spect', 
             'Short-Time-Energy', 'Pitch', 'Spectral Centroid', 'Filtering'
         ])
         self.method_selector.setCurrentText('Spectrogram')
@@ -97,7 +97,6 @@ class ControlMenu(QDialog):
         self.help_button.clicked.connect(self.show_help)
         main_layout.addWidget(self.help_button, 14, 2, 1, 1, Qt.AlignRight)
 
-
         # Font size controls - NEW POSITION
         font_layout = QHBoxLayout()
         font_label = QLabel("Font Size(in plots):")
@@ -112,7 +111,6 @@ class ControlMenu(QDialog):
         font_container = QWidget()
         font_container.setLayout(font_layout)
         main_layout.addWidget(font_container, 14, 1, 1, 1, Qt.AlignRight)
-        
         
         self.setLayout(main_layout)
         self.update_ui_state('Spectrogram')
@@ -315,6 +313,7 @@ class ControlMenu(QDialog):
             sender.setText("▶ Start Live Analysis")
             self.stop_live_analysis()
 
+    # Audio helpers.
     def start_live_analysis(self):
         """Start live analysis for STFT windows"""
         # Get the button that triggered this
@@ -383,8 +382,8 @@ class ControlMenu(QDialog):
     def start_audio_playback(self):
         """Start audio playback from current cursor position"""
         self.stop_audio_playback()  # Ensure previous playback is stopped
-        
-        self.mid_point_idx = 0
+
+        self.mid_point_idx = 0 
         start_sample = int(self.mid_point_idx)
         audio_segment = self.audio[start_sample:]
 
@@ -483,6 +482,8 @@ class ControlMenu(QDialog):
         # Auto-stop at end
         if self.mid_point_idx >= len(self.audio) - self.wind_size_samples//2:
             self.stop_live_analysis()
+
+    # GUI settting up.
 
     def create_pitch_group(self, layout):
         group = QGroupBox("Pitch")
@@ -606,8 +607,10 @@ class ControlMenu(QDialog):
         
     def update_ui_state(self, method):
         # First define all the mode flags
-        ft_enabled = method == 'FT'
-        stft_enabled = method == 'STFT'
+
+        wave_enabled = method == 'Waveform'
+        ft_enabled = method == 'Fourier Transform'
+        stft_enabled = method == 'Short Time Fourier Transform'
         spectrogram_enabled = method == 'Spectrogram'
         stft_spect_enabled = method == 'STFT + Spect'
         ste_enabled = method == 'Short-Time-Energy'
@@ -636,11 +639,10 @@ class ControlMenu(QDialog):
         self.draw_style.setEnabled(spectrogram_enabled or stft_spect_enabled or 
                                  spectral_centroid_enabled or filtering_enabled)
         self.show_pitch.setEnabled(
-            spectrogram_enabled or stft_spect_enabled or 
+            spectrogram_enabled or stft_spect_enabled or ste_enabled or
             (filtering_enabled and hasattr(self, 'waveform_radio') and not self.waveform_radio.isChecked()))
 
         
-        # Rest of the method remains the same...
         # STE controls
         if ste_enabled and self.window_type.currentText() == 'Kaiser':
             self.beta.setEnabled(True)
@@ -685,13 +687,18 @@ class ControlMenu(QDialog):
 
         return min_freq, max_freq
 
+
+    ### PLOTS ###
+
     def plot_figure(self):
         method = self.method_selector.currentText()
         
         try:
-            if method == 'FT':
+            if method == 'Fourier Transform':
                 self.plot_ft()
-            elif method == 'STFT':
+            elif method == 'Waveform':
+                self.plot_waveform()
+            elif method == 'Short Time Fourier Transform':
                 self.plot_stft()
             elif method == 'Spectrogram':
                 self.plot_spectrogram()
@@ -711,9 +718,28 @@ class ControlMenu(QDialog):
             if self.current_figure:
                 plt.close(self.current_figure)
 
+    # WAVEFORM
+
+    def plot_waveform(self):
+        # Get current font size (default to 12 if not set)
+        fontsize = getattr(self, 'current_font_size', 12)
+        
+        # Set style before creating figure
+        plt.style.use('default')
+        plt.rcParams.update({'font.size': fontsize})
+
+        self.current_figure, ax = plt.subplots(figsize=(12, 6))  # Use figsize for consistency
+        self.current_figure.suptitle('Waveform')
+
+        ax.plot(self.time, self.audio)
+        ax.set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
+        ax.tick_params(axis='both', labelsize=fontsize*0.9)  # Slightly smaller ticks
+        
+        # Add the call to show_plot_window like in the working example
+        self.show_plot_window(self.current_figure, ax, self.audio)
+        
 
     # FT
-
     def plot_ft(self):
         # Get current font size (default to 12 if not set)
         fontsize = getattr(self, 'current_font_size', 12)
@@ -828,6 +854,7 @@ class ControlMenu(QDialog):
         # Compute STFT with padding if needed
         if len(windowed) < self.nfft_val:
             windowed = np.pad(windowed, (0, self.nfft_val - len(windowed)))
+
         stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
         freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
 
@@ -1176,7 +1203,6 @@ class ControlMenu(QDialog):
         plot_dialog.show()
         return plot_dialog
 
-
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
         try:
@@ -1466,6 +1492,7 @@ class ControlMenu(QDialog):
     def calculate_sc(self, segment):
         magnitudes = np.abs(np.fft.rfft(segment))
         freqs = np.fft.rfftfreq(len(segment), 1/self.fs)
+        magnitudes = magnitudes ** 2
         return np.sum(magnitudes * freqs) / np.sum(magnitudes)
 
     def on_sc_window_click(self, event, ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft):
@@ -1491,6 +1518,7 @@ class ControlMenu(QDialog):
     def update_spectral_centroid_plot(self, ax1, ax2, ax3, cax, draw_style, min_freq, max_freq, nfft):
         """Update all plots with current window position"""
         # Clear previous plots
+
         for ax in [ax1, ax2, ax3, cax]:
             ax.clear()
         
@@ -1511,9 +1539,9 @@ class ControlMenu(QDialog):
         ax1.set_ylabel("Amplitude")
         ax1.set_xlim(self.time[0], self.time[-1])
 
-        # === PSD ===
         _, freqs = ax2.psd(windowed_segment, NFFT=self.sc_wind_size_samples, Fs=self.fs,
-                           window=self.sc_window, noverlap=int(self.sc_wind_size_samples//2))
+                           window=self.sc_window, noverlap=0)
+
         ax2.axvline(x=spectral_centroid, color='r')
         ax2.set_xlim([0, max(freqs)])
         ax2.set_ylabel("Power")
@@ -1974,7 +2002,6 @@ class ControlMenu(QDialog):
 
         # Store selector using the tag (e.g., 'original', 'filtered')
         self.span_selectors[plot_dialog.plot_id][tag] = span_selector
-
 
     def cleanup_plot_window(self, plot_id):
         """Clean up when any plot window closes"""

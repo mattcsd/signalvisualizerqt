@@ -273,12 +273,12 @@ class Start(QMainWindow):
         # Connect to aboutToShow to auto-update
         windows_menu.aboutToShow.connect(self.update_windows_menu)
 
-
+        '''
         # Options menu
         options_menu = menubar.addMenu("Options")
         self._add_menu_button(options_menu, "Spectrogram", "Configure spectrogram display settings",
                              lambda: self.initialize_frame('Spectrogram'))
-
+        '''
 
     def update_windows_menu(self):
         """Update the windows menu with current open windows"""
@@ -339,7 +339,6 @@ class Start(QMainWindow):
                     self.plot_windows_menu.addAction(action)
                     plot_count += 1
 
-                
     def focus_window(self, window):
         """Bring a window to focus"""
         if window:
@@ -412,6 +411,9 @@ class Start(QMainWindow):
             QMessageBox.critical(self, "Error", f"Could not launch tuner: {str(e)}")
 
     def cleanup_tuner(self):
+
+        #   ADD THIS WHEN CLOSING THE TUNER AND CHANGING TO ANOTHER PAGE.
+
         """Clean up tuner resources"""
         if hasattr(self, 'tuner_window'):
             try:
@@ -420,7 +422,6 @@ class Start(QMainWindow):
             except:
                 pass
             del self.tuner_window
-
 
     def closeEvent(self, event):
         """Handle the window close event."""
@@ -436,7 +437,6 @@ class Start(QMainWindow):
             event.accept()
         else:
             event.ignore()
-
 
 class SignalVisualizer(QWidget):
     def __init__(self, master, controller):
