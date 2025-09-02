@@ -77,8 +77,8 @@ class Load(QWidget):
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             "Open Audio File", 
-            str(LIBRARY_DIR),  # Set initial directory to library
-            "WAV Files (*.wav);;All Files (*)"
+            str(library_dir),  # Use library_dir instead of LIBRARY_DIR
+            "Audio Files (*.wav *.mp3);;WAV Files (*.wav);;MP3 Files (*.mp3);;All Files (*)"
         )
         
         if not file_path:  # User cancelled
@@ -87,28 +87,25 @@ class Load(QWidget):
         self.file_path = file_path
         
         try:
-            # Read audio file
-            audio, self.fs = sf.read(file_path, dtype='float32')
+            # Read audio file using librosa (supports both WAV and MP3)
+            audio, self.fs = librosa.load(file_path, sr=None, mono=False)
             
             # Check if stereo and convert to mono if needed
-            with open(file_path, 'rb') as wav:
-                header_beginning = wav.read(0x18)
-                wavChannels, = struct.unpack_from('<H', header_beginning, 0x16)
-                if wavChannels > 1:
-                    QMessageBox.warning(
-                        self, 
-                        "Stereo File", 
-                        "This file is in stereo mode. It will be converted to mono."
-                    )
-                    ampMax = np.max(np.abs(audio))
-                    audio = np.sum(audio, axis=1)  # Convert to mono
-                    audio = audio * ampMax / np.max(np.abs(audio))  # Normalize
+            if audio.ndim > 1:
+                QMessageBox.warning(
+                    self, 
+                    "Stereo File", 
+                    "This file is in stereo mode. It will be converted to mono."
+                )
+                ampMax = np.max(np.abs(audio))
+                audio = np.mean(audio, axis=0)  # Convert to mono by averaging channels
+                audio = audio * ampMax / np.max(np.abs(audio))  # Normalize
             
             self.plotAudio(audio)
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not load file: {str(e)}")
-            
+    
     def plotAudio(self, audio):
         self.ax.clear()
 
