@@ -81,33 +81,31 @@ class FreeAdditionPureTones(QDialog):
         control_layout = QGridLayout()
         control_panel.setLayout(control_layout)
         
-        # Compact controls layout
+        # Reduce the width of amplitude controls
         for i in range(6):
             # Frequency controls
             control_layout.addWidget(QLabel(f"Frq{i+1}"), 0, i*2)
             sb = QSpinBox()
             sb.setRange(0, 24000)
-
             int_dval = int(self.default_values[6+i*2])
             sb.setValue(int_dval)
-
-            sb.setMaximumWidth(80)
+            sb.setMaximumWidth(70)  # Reduced from 80
             self.freq_spinboxes.append(sb)
             control_layout.addWidget(sb, 1, i*2)
             
-            # Amplitude controls
+            # Amplitude controls - made more compact
             control_layout.addWidget(QLabel(f"Amp{i+1}"), 0, i*2+1)
             slider = QSlider(Qt.Horizontal)
             slider.setRange(0, 100)
             slider.setValue(int(float(self.default_values[18+i*2]) * 100))
-            slider.setMaximumWidth(100)
+            slider.setMaximumWidth(70)  # Reduced from 100
             self.amp_sliders.append(slider)
             control_layout.addWidget(slider, 1, i*2+1)
             
-            # Value display
+            # Value display - made smaller
             value_label = QLabel(f"{slider.value()/100:.2f}")
             value_label.setAlignment(Qt.AlignCenter)
-            value_label.setMaximumWidth(40)
+            value_label.setMaximumWidth(30)  # Reduced from 40
             slider.valueChanged.connect(lambda v, lbl=value_label: lbl.setText(f"{v/100:.2f}"))
             control_layout.addWidget(value_label, 2, i*2+1)
 
@@ -123,7 +121,7 @@ class FreeAdditionPureTones(QDialog):
         self.dur_spinbox = QSpinBox()
         self.dur_spinbox.setRange(1, 3000)
         self.dur_spinbox.setValue(int(float(self.default_values[2]) * 100))
-        self.dur_spinbox.setMaximumWidth(80)
+        self.dur_spinbox.setMaximumWidth(70)  # Reduced from 80
         dur_layout.addWidget(self.dur_spinbox)
         
         # Buttons
@@ -138,26 +136,29 @@ class FreeAdditionPureTones(QDialog):
         for text, callback in buttons:
             btn = QPushButton(text)
             btn.clicked.connect(callback)
-            btn.setMaximumWidth(100 if text == 'Load to Controller' else 80)
+            btn.setMaximumWidth(90 if text == 'Load to Controller' else 70)  # Reduced button widths
             btn_layout.addWidget(btn)
             if text == 'Piano':  # Store reference to piano button
                 self.piano_btn = btn
         
-        # Add to main layout
-        main_layout.addWidget(control_panel)
-        main_layout.addLayout(dur_layout)
-        main_layout.addLayout(btn_layout)
+        # Add to main layout with stretch factors to give more space to plot
+        main_layout.addWidget(control_panel, 0)  # 0 stretch factor - fixed height
+        main_layout.addLayout(dur_layout, 0)     # 0 stretch factor - fixed height
+        main_layout.addLayout(btn_layout, 0)     # 0 stretch factor - fixed height
         
-        # Matplotlib figure
-        self.fig, self.ax = plt.subplots(figsize=(8, 4))
+        # Matplotlib figure - make it larger
+        self.fig, self.ax = plt.subplots(figsize=(10, 6))  # Increased from (8, 4)
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
         
-        main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas)
+        main_layout.addWidget(self.toolbar, 0)   # 0 stretch factor - fixed height
+        main_layout.addWidget(self.canvas, 1)    # 1 stretch factor - will expand
+        
+        # Set stretch factors to give more space to the plot
+        main_layout.setStretchFactor(self.canvas, 10)  # Higher value gives more space to canvas
         
         self.setLayout(main_layout)
-
+        
     def showHelp(self):
         """Show help window for this module"""
         if hasattr(self, 'help') and self.help:
