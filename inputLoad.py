@@ -168,12 +168,21 @@ class Load(QWidget):
         return f"{minutes:02d}:{seconds:06.3f}"[:8]  # Shows mm:ss.xx
 
     def addLoadButton(self):
-        # Remove existing button if it exists
+        # Remove existing buttons if they exist
         if hasattr(self, 'load_button_ax'):
             self.fig.delaxes(self.load_button_ax)
+        if hasattr(self, 'stop_button_ax'):
+            self.fig.delaxes(self.stop_button_ax)
             
-        # Create button axes
+        # Create button axes for both buttons
+        self.stop_button_ax = self.fig.add_axes([0.65, 0.01, 0.12, 0.05])
         self.load_button_ax = self.fig.add_axes([0.8, 0.01, 0.15, 0.05])
+        
+        # Create Stop Audio button
+        self.stop_button = Button(self.stop_button_ax, 'Stop Audio')
+        self.stop_button.on_clicked(lambda event: sd.stop())
+        
+        # Create Load to Controller button
         self.load_button = Button(self.load_button_ax, 'Load to Controller')
         
         def on_load(event):
