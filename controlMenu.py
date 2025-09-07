@@ -760,11 +760,20 @@ class ControlMenu(QDialog):
         ax[0].tick_params(axis='both', labelsize=fontsize*0.9)  # Slightly smaller ticks
 
         min_freq, max_freq = self.get_freq_bounds()
-        ax[1].plot(freqs, 20*np.log10(abs(fft)))
-        ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', ylabel='Amplitude (dB)')
+        
+        # Calculate magnitude and convert to dB (relative scale)
+        magnitude = np.abs(fft)
+        # Use a small epsilon to avoid log(0) which would be -infinity
+        epsilon = 1e-10
+        magnitude_db = 20 * np.log10(magnitude + epsilon)
+        
+        # Normalize to have 0 dB as the maximum (optional but common)
+        # magnitude_db = 20 * np.log10(magnitude/np.max(magnitude) + epsilon)
+        
+        ax[1].plot(freqs, magnitude_db)
+        ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
 
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-
 
     # STFT
 
@@ -830,7 +839,7 @@ class ControlMenu(QDialog):
 
     def update_stft_plot(self, ax):
         """Update plot with proper array handling"""
-        for a in ax:
+        for a in ax[:2]:  # Clear only the first two axes
             a.clear()
         
         # Current analysis window with boundary checks
@@ -855,29 +864,34 @@ class ControlMenu(QDialog):
         if len(windowed) < self.nfft_val:
             windowed = np.pad(windowed, (0, self.nfft_val - len(windowed)))
 
-        stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
+        # Normalize the STFT similar to how you normalize the FT
+        stft = np.fft.fft(windowed, self.nfft_val) / len(windowed)
+        stft = stft[:self.nfft_val//2]  # Take only positive frequencies
         freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
 
         # Plotting with matched dimensions
         ax[0].plot(self.time, self.audio)
-
         ax[0].set_xlim(self.time[0], self.time[-1])
-
-
         ax[0].axvspan(time_segment[0], time_segment[-1], 
                      color='lightblue', alpha=0.3)
         ax[0].axvline(self.time[self.mid_point_idx], color='red', ls='--')
+        ax[0].set_ylabel('Amplitude')
+        ax[0].set_title('Time Domain Signal')
+        
+        # Calculate magnitude and convert to dB (normalized)
+        magnitude = np.abs(stft)
+        magnitude_db = 20 * np.log10(magnitude + 1e-10)
         
         min_freq, max_freq = self.get_freq_bounds()
-        ax[1].plot(freqs, 20*np.log10(stft + 1e-10))
+        ax[1].plot(freqs, magnitude_db)
         ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', 
                  ylabel='Magnitude (dB)')
+        ax[1].set_title('Frequency Spectrum at Selected Window')
         
         self.current_figure.canvas.draw()
 
 
     # Pitch
-
     def calculate_pitch(self, signal=None):
         """Calculate pitch using YIN algorithm with optional signal override."""
         try:
@@ -935,7 +949,6 @@ class ControlMenu(QDialog):
         self.current_figure, ax = plt.subplots(2, figsize=(12,6))
         self.current_figure.suptitle('Pitch Contour')
         
-        # No need to write to file - we can work directly with the audio array
         audio = self.audio.astype(np.float32)  # Ensure correct dtype for librosa
         
 
@@ -992,7 +1005,6 @@ class ControlMenu(QDialog):
 
 
     # Spectrogram
-
     def validate_spectrogram_parameters(self):
         """Validate spectrogram parameters and return calculated values"""
         # Get parameters from UI
@@ -1114,8 +1126,6 @@ class ControlMenu(QDialog):
 
 
     # STFT + Spectrogram
-
-
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
         """Create a specialized dialog for STFT plots with live analysis button only"""
         plot_dialog = QDialog(self)

@@ -1,0 +1,3 @@
+Simplified the stereo detection using audio.ndim > 1 instead of reading the WAV header
+
+Changed the stereo-to-mono conversion from np.sum(audio, axis=1) to np.mean(audio, axis=0) which is more appropriate for averaging channels
