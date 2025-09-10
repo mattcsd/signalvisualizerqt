@@ -1156,7 +1156,8 @@ class ControlMenu(QDialog):
                 audio_playing = False
         
         # If audio is not playing or not enabled, use timer-based movement
-        if not audio_playing:
+        # BUT only if audio playback is not enabled
+        if not audio_playing and not (hasattr(dialog, 'audio_playback_checkbox') and dialog.audio_playback_checkbox.isChecked()):
             step_size = self.hop_size
             new_mid_point = self.mid_point_idx + step_size
             
@@ -1411,8 +1412,7 @@ class ControlMenu(QDialog):
             import traceback
             traceback.print_exc()
             return None
-
-        
+       
     def update_live_speed(self, value, dialog=None):
         """Update the live analysis speed based on slider value"""
         if dialog is None and hasattr(self, 'current_figure'):
@@ -1425,7 +1425,12 @@ class ControlMenu(QDialog):
             return
         
         dialog.live_analysis_interval = value
-        if hasattr(dialog, 'live_analysis_timer') and dialog.live_analysis_timer.isActive():
+        
+        # Only update the timer interval if audio playback is not enabled
+        if (hasattr(dialog, 'audio_playback_checkbox') and 
+            not dialog.audio_playback_checkbox.isChecked() and
+            hasattr(dialog, 'live_analysis_timer') and 
+            dialog.live_analysis_timer.isActive()):
             dialog.live_analysis_timer.setInterval(value)
         
         # Update the speed label
