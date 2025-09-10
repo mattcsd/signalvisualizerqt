@@ -1,3 +1,6 @@
+
+#douleyei me ta ola prin to start/pause.
+
 from PyQt5.QtWidgets import (QWidget, QDoubleSpinBox, QSpinBox, QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
 from PyQt5.QtCore import Qt, QTimer
@@ -298,20 +301,6 @@ class ControlMenu(QDialog):
         
         group.setLayout(grid)
         layout.addWidget(group, 1, 0, 8, 2)
-
-    def toggle_live_analysis(self):
-        """Toggle live analysis mode for STFT windows"""
-        # Get which button was clicked
-        sender = self.sender()
-        
-        if sender.isChecked():
-            # Button was toggled ON
-            sender.setText("⏹ Stop Live Analysis")
-            self.start_live_analysis()
-        else:
-            # Button was toggled OFF
-            sender.setText("▶ Start Live Analysis")
-            self.stop_live_analysis()
 
     # Audio helpers.
     def start_live_analysis(self):
@@ -728,14 +717,13 @@ class ControlMenu(QDialog):
         plt.style.use('default')
         plt.rcParams.update({'font.size': fontsize})
 
-        self.current_figure, ax = plt.subplots(figsize=(12, 6))  # Use figsize for consistency
+        self.current_figure, ax = plt.subplots(figsize=(12, 6))
         self.current_figure.suptitle('Waveform')
 
         ax.plot(self.time, self.audio)
         ax.set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
         ax.tick_params(axis='both', labelsize=fontsize*0.9)  # Slightly smaller ticks
         
-        # Add the call to show_plot_window like in the working example
         self.show_plot_window(self.current_figure, ax, self.audio)
         
 
@@ -1124,94 +1112,325 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Spectrogram failed: {str(e)}")
 
+    # STFT + Spectro
+    def update_live_analysis(self, dialog):
+        """Update the analysis window position for live analysis synchronized with audio"""
+        # Safety check: ensure dialog still exists
+        try:
+            # This will raise a RuntimeError if the dialog has been deleted
+            _ = dialog.objectName()
+        except RuntimeError:
+            # Dialog has been deleted, stop the timer if it exists
+            if hasattr(dialog, 'live_analysis_timer') and dialog.live_analysis_timer is not None:
+                try:
+                    dialog.live_analysis_timer.stop()
+                except:
+                    pass
+            return
+        
+        if not hasattr(self, 'is_live_analysis_running') or not self.is_live_analysis_running:
+            return
+        
+        # If audio playback is enabled, try to synchronize with the audio position
+        audio_playing = False
+        if (hasattr(dialog, 'audio_playback_checkbox') and 
+            dialog.audio_playback_checkbox.isChecked() and
+            hasattr(dialog, 'audio_start_time')):
+            
+            try:
+                # Calculate the current position based on elapsed time
+                elapsed_time = time.time() - dialog.audio_start_time
+                current_sample = int(elapsed_time * self.fs)
+                audio_playing = True
+                
+                # Check if we've reached the end
+                if current_sample >= len(self.audio):
+                    # Stop at the end
+                    self.toggle_live_analysis(False, dialog)
+                    return
+                
+                self.mid_point_idx = current_sample
+            except Exception as e:
+                print(f"Error in audio synchronization: {e}")
+                # Audio playback not working, fall back to timer-based movement
+                audio_playing = False
+        
+        # If audio is not playing or not enabled, use timer-based movement
+        if not audio_playing:
+            step_size = self.hop_size
+            new_mid_point = self.mid_point_idx + step_size
+            
+            # Check if we've reached the end
+            if new_mid_point >= len(self.audio):
+                # Stop at the end instead of wrapping around
+                self.toggle_live_analysis(False, dialog)
+                return
+            
+            self.mid_point_idx = new_mid_point
+        
+        # Update the plots
+        if hasattr(self, 'current_figure') and self.current_figure:
+            # Find the axes from the current figure
+            axes = self.current_figure.get_axes()
+            if len(axes) >= 3:
+                self.update_stft_spect_plot(axes[0], axes[1], axes[2])
 
-    # STFT + Spectrogram
+    def toggle_live_analysis(self, checked, dialog=None):
+        """Toggle live analysis scrolling with audio playback"""
+        # If no dialog is passed, try to get it from the current figure
+        if dialog is None and hasattr(self, 'current_figure'):
+            for window in self.plot_windows:
+                if hasattr(window, 'figure') and window.figure == self.current_figure:
+                    dialog = window
+                    break
+        
+        if dialog is None:
+            print("No dialog found for live analysis")
+            return
+        
+        if checked:
+            # Start live analysis from the beginning
+            self.mid_point_idx = 0
+            self.is_live_analysis_running = True
+            dialog.live_analysis_btn.setText("■ Stop Live Analysis")
+            
+            # Start audio playback if enabled
+            if (hasattr(dialog, 'audio_playback_checkbox') and 
+                dialog.audio_playback_checkbox.isChecked()):
+                # Test if audio is available before trying to play
+                try:
+                    # This will raise an exception if no audio device is available
+                    sd.check_output_settings()
+                    self.start_audio_playback(dialog)
+                except sd.PortAudioError as e:
+                    print(f"No audio device available: {e}")
+                    dialog.audio_playback_checkbox.setChecked(False)
+            
+            # Create timer if it doesn't exist
+            if not hasattr(dialog, 'live_analysis_timer'):
+                dialog.live_analysis_timer = QTimer()
+                dialog.live_analysis_timer.timeout.connect(lambda: self.update_live_analysis(dialog))
+            
+            # Set initial interval from slider or default
+            if hasattr(dialog, 'speed_slider'):
+                interval = dialog.speed_slider.value()
+            else:
+                interval = 100  # Default 100ms
+            
+            dialog.live_analysis_timer.start(interval)
+        else:
+            # Stop live analysis
+            self.is_live_analysis_running = False
+            dialog.live_analysis_btn.setText("▶ Start Live Analysis")
+            if hasattr(dialog, 'live_analysis_timer'):
+                dialog.live_analysis_timer.stop()
+            
+            # Stop audio playback if it's active
+            try:
+                sd.stop()
+            except Exception as e:
+                print(f"Error stopping audio: {e}")
+
+    def start_audio_playback(self, dialog):
+        """Start playing the entire audio from the beginning"""
+        try:
+            # Print debug information
+            print(f"Audio info: shape={self.audio.shape}, dtype={self.audio.dtype}, max={np.max(self.audio)}, min={np.min(self.audio)}")
+            print(f"Sample rate: {self.fs}")
+            
+            # Check if audio data needs normalization
+            audio_data = self.audio.astype(np.float32)
+            max_val = np.max(np.abs(audio_data))
+            print(f"Max absolute value: {max_val}")
+            
+            if max_val > 1.0:
+                print("Normalizing audio data")
+                audio_data = audio_data / max_val
+            
+            # Check number of channels
+            channels = 1 if len(audio_data.shape) == 1 else audio_data.shape[1]
+            print(f"Channels: {channels}")
+            
+            # Get default output device
+            default_device = sd.default.device
+            print(f"Default audio device: {default_device}")
+            print(f"Available devices: {sd.query_devices()}")
+            
+            # Store the audio data in the dialog to prevent garbage collection
+            dialog.audio_data = audio_data
+            
+            # Create a simple playback without callback
+            # This is a simpler approach that should work more reliably
+            dialog.audio_start_time = time.time()
+            
+            # Play the audio using a simple non-blocking approach
+            sd.play(audio_data, samplerate=self.fs, blocking=False, blocksize=32768, latency='high')            
+            print("Audio playback started successfully")
+            
+        except Exception as e:
+            print(f"Error starting audio playback: {e}")
+            import traceback
+            traceback.print_exc()
+                
     def create_stft_plot_dialog(self, figure, waveform_ax, audio_signal):
         """Create a specialized dialog for STFT plots with live analysis button only"""
-        plot_dialog = QDialog(self)
-        plot_dialog.setWindowTitle("STFT Analysis")
-        plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
-        plot_dialog.plot_id = id(plot_dialog)
-        
-        # Initialize all cursor-related attributes
-        plot_dialog.active_stream = None
-        plot_dialog.cursor_timer = QTimer()  # Initialize timer here
-        plot_dialog.cursor_timer.setSingleShot(False)
-        plot_dialog.cursor_line = None
-        plot_dialog.spectrogram_cursor_line = None
-        plot_dialog._background_waveform = None
-        plot_dialog._background_spectrogram = None
+        try:
+            start, end = 0, self.duration
+            plot_title = f"{"STFT&Spectro"}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
 
-        # Create main layout
-        main_layout = QVBoxLayout()
-
-        # ▶ Live analysis button
-        live_btn = QPushButton("▶ Start Live Analysis")
-        live_btn.setCheckable(True)
-        live_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ccffcc;
-                border: 1px solid #ccc;
-                padding: 5px;
-                margin: 5px;
-            }
-            QPushButton:checked {
-                background-color: #ffcccc;
-            }
-        """)
-        live_btn.clicked.connect(self.toggle_live_analysis)
-        main_layout.addWidget(live_btn)
-
-        # Canvas and toolbar
-        canvas = FigureCanvas(figure)
-        toolbar = NavigationToolbar(canvas, plot_dialog)
-        main_layout.addWidget(toolbar)
-        main_layout.addWidget(canvas)
-
-        # Set the final layout
-        plot_dialog.setLayout(main_layout)
-
-        # Store references
-        plot_dialog.figure = figure
-        plot_dialog.waveform_ax = waveform_ax
-        plot_dialog.live_analysis_btn = live_btn
-        plot_dialog.canvas = canvas  # Store canvas reference for cursor updates
-
-        # Setup span selector - pass the dialog object itself
-        self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
-
-        def handle_close():
-            # Stop audio playback if active
-            if plot_dialog.active_stream is not None:
-                try:
-                    plot_dialog.active_stream.stop()
-                    plot_dialog.active_stream.close()
-                except Exception as e:
-                    print(f"Error stopping audio: {e}")
+            plot_dialog = QDialog(self)
+            plot_dialog.setWindowTitle(plot_title)
+            plot_dialog.setAttribute(Qt.WA_DeleteOnClose)
+            plot_dialog.plot_id = id(plot_dialog)
             
-            # Stop and disconnect cursor timer
-            if plot_dialog.cursor_timer is not None:
-                try:
-                    plot_dialog.cursor_timer.stop()
-                    plot_dialog.cursor_timer.timeout.disconnect()
-                except Exception as e:
-                    print(f"Error stopping timer: {e}")
+            # Initialize all cursor-related attributes
+            plot_dialog.active_stream = None
+            plot_dialog.cursor_timer = QTimer()  # Initialize timer here
+            plot_dialog.cursor_timer.setSingleShot(False)
+            plot_dialog.cursor_line = None
+            plot_dialog.spectrogram_cursor_line = None
+            plot_dialog._background_waveform = None
+            plot_dialog._background_spectrogram = None
+
+            # Create main layout
+            main_layout = QVBoxLayout()
+
+            # ▶ Live analysis button
+            live_btn = QPushButton("▶ Start Live Analysis")
+            live_btn.setCheckable(True)
+            live_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #ccffcc;
+                    border: 1px solid #ccc;
+                    padding: 5px;
+                    margin: 5px;
+                }
+                QPushButton:checked {
+                    background-color: #ffcccc;
+                }
+            """)
+            live_btn.clicked.connect(lambda checked: self.toggle_live_analysis(checked, plot_dialog))        
+            main_layout.addWidget(live_btn)
+
+            # Speed control layout
+            speed_layout = QHBoxLayout()
+            speed_label = QLabel("Speed:")
+            speed_layout.addWidget(speed_label)
             
-            # Clean up other resources
-            self.cleanup_plot_window(plot_dialog.plot_id)
+            # Add speed control slider
+            speed_slider = QSlider(Qt.Horizontal)
+            speed_slider.setRange(10, 500)  # 10ms to 500ms
+            speed_slider.setValue(100)      # Default 100ms
+            speed_slider.setTickPosition(QSlider.TicksBelow)
+            speed_slider.setTickInterval(50)
+            speed_slider.valueChanged.connect(lambda value: self.update_live_speed(value, plot_dialog))        
+            speed_layout.addWidget(speed_slider)
+            
+            speed_value_label = QLabel("100 ms")
+            speed_layout.addWidget(speed_value_label)
+            main_layout.addLayout(speed_layout)
+
+            # Audio playback checkbox
+            audio_playback_checkbox = QCheckBox("Play audio during analysis")
+            audio_playback_checkbox.setChecked(False)
+            main_layout.addWidget(audio_playback_checkbox)
+            plot_dialog.audio_playback_checkbox = audio_playback_checkbox
+
+            # Connect the checkbox to enable/disable the speed slider
+            def toggle_speed_slider(checked):
+                speed_slider.setEnabled(not checked)
+                speed_label.setEnabled(not checked)
+                speed_value_label.setEnabled(not checked)
+
+            audio_playback_checkbox.stateChanged.connect(toggle_speed_slider)
+
+            # Set initial state
+            toggle_speed_slider(audio_playback_checkbox.isChecked())
+
+            # Canvas and toolbar
+            canvas = FigureCanvas(figure)
+            toolbar = NavigationToolbar(canvas, plot_dialog)
+            main_layout.addWidget(toolbar)
+            main_layout.addWidget(canvas)
+
+            # Set the final layout
+            plot_dialog.setLayout(main_layout)
+
+            # Store references
+            plot_dialog.figure = figure
+            plot_dialog.waveform_ax = waveform_ax
+            plot_dialog.live_analysis_btn = live_btn
+            plot_dialog.canvas = canvas  # Store canvas reference for cursor updates
+            plot_dialog.speed_slider = speed_slider
+            plot_dialog.speed_value_label = speed_value_label
+
+            # Setup span selector - pass the dialog object itself
+            self.create_span_selector(waveform_ax, audio_signal, plot_dialog)
+
+            # Define the handle_close function inside this method
+            def handle_close():
+                # Stop audio playback if active
+                if hasattr(plot_dialog, 'audio_stream') and plot_dialog.audio_stream is not None:
+                    try:
+                        plot_dialog.audio_stream.stop()
+                        plot_dialog.audio_stream.close()
+                    except Exception as e:
+                        print(f"Error stopping audio: {e}")
+                
+                # Stop and disconnect cursor timer
+                if hasattr(plot_dialog, 'live_analysis_timer') and plot_dialog.live_analysis_timer is not None:
+                    try:
+                        plot_dialog.live_analysis_timer.stop()
+                        # Disconnect all connections from the timer
+                        try:
+                            plot_dialog.live_analysis_timer.timeout.disconnect()
+                        except TypeError:
+                            # This might fail if no connections exist, which is fine
+                            pass
+                    except Exception as e:
+                        print(f"Error stopping timer: {e}")
+                
+                # Clean up other resources
+                self.cleanup_plot_window(plot_dialog.plot_id)
+
+            plot_dialog.finished.connect(handle_close)
+
+            # Track open windows
+            self.plot_windows.append(plot_dialog)
+
+            # Debug print
+            print(f"Total plot windows: {len(self.plot_windows)}")
+            for i, window in enumerate(self.plot_windows):
+                print(f"Window {i+1} title: {window.windowTitle()}")
+
+            plot_dialog.show()
+            return plot_dialog
+            
+        except Exception as e:
+            print(f"Error creating STFT plot dialog: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
         
-        plot_dialog.finished.connect(handle_close)
-
-        # Track open windows
-        self.plot_windows.append(plot_dialog)
-
-        # Debug print
-        print(f"Total plot windows: {len(self.plot_windows)}")
-        for i, window in enumerate(self.plot_windows):
-            print(f"Window {i+1} title: {window.windowTitle()}")
-
-        plot_dialog.show()
-        return plot_dialog
+    def update_live_speed(self, value, dialog=None):
+        """Update the live analysis speed based on slider value"""
+        if dialog is None and hasattr(self, 'current_figure'):
+            for window in self.plot_windows:
+                if hasattr(window, 'figure') and window.figure == self.current_figure:
+                    dialog = window
+                    break
+        
+        if dialog is None:
+            return
+        
+        dialog.live_analysis_interval = value
+        if hasattr(dialog, 'live_analysis_timer') and dialog.live_analysis_timer.isActive():
+            dialog.live_analysis_timer.setInterval(value)
+        
+        # Update the speed label
+        if hasattr(dialog, 'speed_value_label'):
+            dialog.speed_value_label.setText(f"{value} ms")
 
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
@@ -1244,6 +1463,8 @@ class ControlMenu(QDialog):
             cbar_ax = plt.subplot(gs[:, 1])
             
             self.current_figure.suptitle('STFT + Spectrogram', y=0.98)
+
+            self.is_live_analysis_running = False
             
             # Ensure time and audio arrays match
             if len(self.time) > len(self.audio):
@@ -1310,8 +1531,13 @@ class ControlMenu(QDialog):
             # Create and show the plot dialog with live analysis button
             plot_dialog = self.create_stft_plot_dialog(self.current_figure, ax1, self.audio)
 
-            # Store spectrogram axis reference
-            plot_dialog.spectrogram_ax = ax3
+            # Store spectrogram axis reference only if dialog was created successfully
+            if plot_dialog is not None:
+                plot_dialog.spectrogram_ax = ax3
+            else:
+                print("Warning: Failed to create plot dialog")
+                return None  # Return early if dialog creation failed
+
             return plot_dialog
 
         except Exception as e:
@@ -1452,7 +1678,6 @@ class ControlMenu(QDialog):
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-
 
     # Spectral Centroid
 
@@ -2102,9 +2327,6 @@ class ControlMenu(QDialog):
         control_layout.addWidget(plot_dialog.end_spin)
         control_layout.addWidget(play_button)
 
-
-
-
         # Add to main layout
         layout.addWidget(toolbar)
         layout.addLayout(control_layout)  # Add controls below toolbar
@@ -2408,8 +2630,3 @@ class ControlMenu(QDialog):
         
         event.accept()
         super().closeEvent(event)
-
-
-
-
-
