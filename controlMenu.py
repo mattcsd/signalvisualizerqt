@@ -1371,12 +1371,10 @@ class ControlMenu(QDialog):
             # Define the handle_close function inside this method
             def handle_close():
                 # Stop audio playback if active
-                if hasattr(plot_dialog, 'audio_stream') and plot_dialog.audio_stream is not None:
-                    try:
-                        plot_dialog.audio_stream.stop()
-                        plot_dialog.audio_stream.close()
-                    except Exception as e:
-                        print(f"Error stopping audio: {e}")
+                try:
+                    sd.stop()  # This will stop all audio playback
+                except Exception as e:
+                    print(f"Error stopping audio: {e}")
                 
                 # Stop and disconnect cursor timer
                 if hasattr(plot_dialog, 'live_analysis_timer') and plot_dialog.live_analysis_timer is not None:
