@@ -1440,7 +1440,6 @@ class ControlMenu(QDialog):
     def plot_stft_spect(self):
         """STFT + Spectrogram with interactive window selection and live analysis button"""
         try:
-
             # Get current font size (default to 12 if not set)
             fontsize = getattr(self, 'current_font_size', 12)
             
@@ -1456,10 +1455,77 @@ class ControlMenu(QDialog):
             self.min_freq_val = min_freq
             self.max_freq_val = max_freq
 
-
             draw_style = self.draw_style.currentIndex() + 1
             
-            # Create figure with adjusted layout
+            # STFT analysis properties - set these first
+            self.wind_size_samples = int(wind_size * self.fs)
+            self.hop_size = self.wind_size_samples - int(overlap * self.fs)
+            self.window = self.get_window(self.wind_size_samples)
+            self.nfft_val = nfft
+
+            # Calculate the global range of STFT values for consistent y-axis scaling
+            # We'll analyze multiple representative windows to find the true range
+            self.global_stft_min = float('inf')
+            self.global_stft_max = float('-inf')
+
+            # Sample windows at regular intervals throughout the audio
+            sample_indices = np.linspace(0, len(self.audio) - self.wind_size_samples, 
+                                        min(100, len(self.audio) // self.wind_size_samples), 
+                                        dtype=int)
+            
+            for i in sample_indices:
+                start = i
+                end = i + self.wind_size_samples
+                
+                # Get the audio segment
+                audio_segment = self.audio[start:end]
+                window_segment = self.window[:len(audio_segment)]
+                
+                # Ensure perfect alignment
+                if len(audio_segment) < len(window_segment):
+                    window_segment = window_segment[:len(audio_segment)]
+                elif len(window_segment) < len(audio_segment):
+                    audio_segment = audio_segment[:len(window_segment)]
+                
+                windowed = audio_segment * window_segment
+                
+                # Compute STFT with padding if needed
+                if len(windowed) < self.nfft_val:
+                    windowed = np.pad(windowed, (0, self.nfft_val - len(windowed)))
+                stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
+                
+                # Convert to dB
+                stft_db = 20 * np.log10(stft + 1e-10)
+                
+                # Update global min and max
+                self.global_stft_min = min(self.global_stft_min, np.min(stft_db))
+                self.global_stft_max = max(self.global_stft_max, np.max(stft_db))
+            
+            
+            # Add a very generous margin to ensure no clipping
+            # Use a combination of percentage and fixed margin
+            range_size = self.global_stft_max - self.global_stft_min
+            
+            # If the range is very small, use a fixed margin
+            if range_size < 10:
+                margin = 5  # 5 dB fixed margin
+            else:
+                margin = range_size * 0.5  # 50% margin
+
+
+            # Add a safety margin to ensure no clipping
+            margin = (self.global_stft_max - self.global_stft_min) * 0.2  # 20% margin
+            self.global_stft_min -= margin
+            self.global_stft_max += margin
+            
+            # Ensure we have a reasonable range even for very quiet signals
+            if self.global_stft_max - self.global_stft_min < 20:  # Less than 20 dB range
+                self.global_stft_min = -100
+                self.global_stft_max = 0
+
+
+            
+            # Now create the figure
             self.current_figure = plt.figure(figsize=(12, 8))
             gs = plt.GridSpec(3, 2, width_ratios=[15, 1], height_ratios=[1, 1, 1.5], hspace=0.4)
             ax1 = plt.subplot(gs[0, 0])
@@ -1477,13 +1543,7 @@ class ControlMenu(QDialog):
             elif len(self.audio) > len(self.time):
                 self.audio = self.audio[:len(self.time)]
             
-            # STFT analysis properties
-            self.wind_size_samples = int(wind_size * self.fs)
-            self.hop_size = self.wind_size_samples - int(overlap * self.fs)
-            self.window = self.get_window(self.wind_size_samples)
-            self.nfft_val = nfft
-
-            #CHECK FOR START
+            # CHECK FOR START
             self.mid_point_idx = len(self.audio) // 2  # Start in middle
             
             # Create initial spectrogram image
@@ -1494,6 +1554,10 @@ class ControlMenu(QDialog):
                 self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='linear',
                                                 sr=self.fs, hop_length=self.hop_size,
                                                 ax=ax3)
+                # Calculate global range from the complete STFT
+                self.global_stft_min = np.min(self.S_db)
+                self.global_stft_max = np.max(self.S_db)
+                
                 # Manually set axis [y]frequency x[audio_duration] range
                 ax3.set_ylim([min_freq, max_freq])
                 ax3.set_xlim([0, len(self.audio) / self.fs])
@@ -1507,9 +1571,18 @@ class ControlMenu(QDialog):
                 self.img = librosa.display.specshow(self.S_db, x_axis='time', y_axis='mel',
                                                 sr=self.fs, hop_length=self.hop_size,
                                                 ax=ax3)
+                # Calculate global range from the complete STFT
+                self.global_stft_min = np.min(self.S_db)
+                self.global_stft_max = np.max(self.S_db)
+                
                 # Manually set axis [y]frequency x[audio_duration] range
                 ax3.set_ylim([min_freq, max_freq])
                 ax3.set_xlim([0, len(self.audio) / self.fs])
+
+            # Add a margin to the global range
+            margin = (self.global_stft_max - self.global_stft_min) * 0.1
+            self.global_stft_min -= margin
+            self.global_stft_max += margin
 
             # Make spectrogram labels more readable
             ax3.set_ylabel('Frequency (Hz)', fontsize=10)
@@ -1525,9 +1598,6 @@ class ControlMenu(QDialog):
             # Initial plot
             self.update_stft_spect_plot(ax1, ax2, ax3)
             
-            #plot_id = id(self.current_figure.canvas.manager.window)
-            #self.create_span_selector(ax1, self.audio, plot_id)
-                        
             self.current_figure.canvas.mpl_connect(
                 'button_press_event', 
                 lambda e: self.on_window_click_spect(e, ax1, ax2, ax3)
@@ -1547,6 +1617,7 @@ class ControlMenu(QDialog):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
+
 
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
@@ -1571,7 +1642,7 @@ class ControlMenu(QDialog):
         self.update_stft_spect_plot(ax1, ax2, ax3)
 
     def update_stft_spect_plot(self, ax1, ax2, ax3, segment=None):
-        """Update plot with proper array handling"""
+        """Update plot with proper array handling and fixed y-axis"""
         # Clear only the plots we need to update (not the spectrogram)
         if segment is None:
             segment = self.audio  # fallback to full audio
@@ -1583,7 +1654,6 @@ class ControlMenu(QDialog):
             self.stop_live_analysis()
             return
 
-        
         # Current analysis window with boundary checks
         start = max(0, self.mid_point_idx - self.wind_size_samples//2)
         end = min(len(self.audio), self.mid_point_idx + self.wind_size_samples//2)
@@ -1608,6 +1678,9 @@ class ControlMenu(QDialog):
         stft = np.abs(np.fft.fft(windowed, self.nfft_val)[:self.nfft_val//2])
         freqs = np.fft.fftfreq(self.nfft_val, 1/self.fs)[:self.nfft_val//2]
         
+        # Convert to dB
+        stft_db = 20 * np.log10(stft + 1e-10)
+        
         # Plot time domain with highlighted window
         ax1.plot(self.time, self.audio)
         ax1.set_xlim([0, len(self.audio) / self.fs])
@@ -1616,15 +1689,37 @@ class ControlMenu(QDialog):
         if self.mid_point_idx < len(self.time):
             ax1.axvline(self.time[self.mid_point_idx], color='red', ls='--')
                 
-        # Plot STFT
-        ax2.plot(freqs, 20*np.log10(stft + 1e-10))
-        ax2.set(xlim=[self.min_freq_val, self.max_freq_val], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
+        # Plot STFT with fixed y-axis using the global range
+        ax2.plot(freqs, stft_db)
+
+        # Check if any values still exceed our global range (should be rare with our generous margins)
+        current_min = np.min(stft_db)
+        current_max = np.max(stft_db)
+        
+        # If current values exceed our global range, adjust the limits for this plot
+        # but keep the global range unchanged for consistency
+        plot_min = self.global_stft_min
+        plot_max = self.global_stft_max
+        
+        if current_min < self.global_stft_min:
+            plot_min = current_min - (self.global_stft_max - self.global_stft_min) * 0.1
+        
+        if current_max > self.global_stft_max:
+            plot_max = current_max + (self.global_stft_max - self.global_stft_min) * 0.1
+        
+        ax2.set(
+            xlim=[self.min_freq_val, self.max_freq_val], 
+            ylim=[plot_min, plot_max],
+            xlabel='Frequency (Hz)', 
+            ylabel='Magnitude (dB)'
+        )
 
         # Update the spectrogram image data instead of recreating it
         self.img.set_array(self.S_db)
         self.img.autoscale()
         
         self.current_figure.canvas.draw()
+                
 
 
     # Short Time Energy
@@ -1670,17 +1765,18 @@ class ControlMenu(QDialog):
         time_points = []
         for i in range(0, len(self.audio) - wind_size_samples, hop_size):
             segment = self.audio[i:i+wind_size_samples] * window
-            energy = 10 * np.log10(np.mean(segment**2))  # Convert to dB
+            #energy = 10 * np.log10(np.mean(segment**2))  # Convert to dB
+            energy = 10 * np.log10(np.mean(segment**2) + 1e-12)  # avoid -inf
             ste.append(energy)
             time_points.append(self.time[i + wind_size_samples//2])  # Center time point
         
         # Plot original waveform
         ax[0].plot(self.time, self.audio)
-        ax[0].set(ylabel='Amplitude')
+        ax[0].set(ylabel='Amplitude (dB)')
         
         # Plot STE in dB
         ax[1].plot(time_points, ste)
-        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude (dB)')
+        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Energy (dB)')
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
