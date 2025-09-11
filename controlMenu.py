@@ -1506,11 +1506,14 @@ class ControlMenu(QDialog):
             # Use a combination of percentage and fixed margin
             range_size = self.global_stft_max - self.global_stft_min
             
+            '''
             # If the range is very small, use a fixed margin
             if range_size < 10:
                 margin = 5  # 5 dB fixed margin
             else:
-                margin = range_size * 0.5  # 50% margin
+                margin = range_size * 0.5  # 50% margin'''
+
+            margin = range_size * 1.0
 
 
             # Add a safety margin to ensure no clipping
@@ -1519,8 +1522,8 @@ class ControlMenu(QDialog):
             self.global_stft_max += margin
             
             # Ensure we have a reasonable range even for very quiet signals
-            if self.global_stft_max - self.global_stft_min < 20:  # Less than 20 dB range
-                self.global_stft_min = -100
+            if self.global_stft_max - self.global_stft_min < 40:  # Less than 20 dB range
+                self.global_stft_min = -120
                 self.global_stft_max = 0
 
 
@@ -1691,33 +1694,22 @@ class ControlMenu(QDialog):
                 
         # Plot STFT with fixed y-axis using the global range
         ax2.plot(freqs, stft_db)
+        
 
-        # Check if any values still exceed our global range (should be rare with our generous margins)
-        current_min = np.min(stft_db)
         current_max = np.max(stft_db)
-        
-        # If current values exceed our global range, adjust the limits for this plot
-        # but keep the global range unchanged for consistency
-        plot_min = self.global_stft_min
-        plot_max = self.global_stft_max
-        
-        if current_min < self.global_stft_min:
-            plot_min = current_min - (self.global_stft_max - self.global_stft_min) * 0.1
-        
-        if current_max > self.global_stft_max:
-            plot_max = current_max + (self.global_stft_max - self.global_stft_min) * 0.1
-        
+        ylim_top = max(self.global_stft_max, current_max) + 3  # add margin
         ax2.set(
             xlim=[self.min_freq_val, self.max_freq_val], 
-            ylim=[plot_min, plot_max],
+            ylim=[self.global_stft_min, ylim_top],
             xlabel='Frequency (Hz)', 
             ylabel='Magnitude (dB)'
         )
 
-        # Update the spectrogram image data instead of recreating it
+
+        # Update spectrogram data while keeping fixed dB range
         self.img.set_array(self.S_db)
-        self.img.autoscale()
-        
+        self.img.set_clim(self.global_stft_min, self.global_stft_max)
+                
         self.current_figure.canvas.draw()
                 
 
