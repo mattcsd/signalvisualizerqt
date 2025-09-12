@@ -676,7 +676,6 @@ class ControlMenu(QDialog):
 
         return min_freq, max_freq
 
-
     ### PLOTS ###
 
     def plot_figure(self):
@@ -723,7 +722,13 @@ class ControlMenu(QDialog):
         ax.plot(self.time, self.audio)
         ax.set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Amplitude')
         ax.tick_params(axis='both', labelsize=fontsize*0.9)  # Slightly smaller ticks
-        
+            
+
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+
+        ax.format_coord = format_time_amp   # time-domain waveform
+
         self.show_plot_window(self.current_figure, ax, self.audio)
         
 
@@ -758,6 +763,15 @@ class ControlMenu(QDialog):
         # Normalize to have 0 dB as the maximum (optional but common)
         # magnitude_db = 20 * np.log10(magnitude/np.max(magnitude) + epsilon)
         
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+
+        def format_freq_db(x, y):
+            return f"freq = {x:.1f} Hz, magnitude = {y:.1f} dB"
+
+        ax[0].format_coord = format_time_amp   # time-domain waveform
+        ax[1].format_coord = format_freq_db    # FFT window
+
         ax[1].plot(freqs, magnitude_db)
         ax[1].set(xlim=[min_freq, max_freq], xlabel='Frequency (Hz)', ylabel='Magnitude (dB)')
 
@@ -876,6 +890,15 @@ class ControlMenu(QDialog):
                  ylabel='Magnitude (dB)')
         ax[1].set_title('Frequency Spectrum at Selected Window')
         
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+
+        def format_freq_db(x, y):
+            return f"freq = {x:.1f} Hz, magnitude = {y:.1f} dB"
+
+        ax[0].format_coord = format_time_amp   # time-domain waveform
+        ax[1].format_coord = format_freq_db    # FFT window
+
         self.current_figure.canvas.draw()
 
 
@@ -988,9 +1011,16 @@ class ControlMenu(QDialog):
             xlabel='Time (s)',
             ylabel='Frequency (Hz)'
         )
+
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+        def format_time_freq(x, y):
+            return f"time = {x:.2f} s, freq = {y:.1f} Hz"
+                
+        ax[0].format_coord = format_time_amp   # time-domain waveform
+        ax[1].format_coord = format_time_freq  # spectrogram
         
         self.show_plot_window(self.current_figure, ax[0], self.audio)
-
 
     # Spectrogram
     def validate_spectrogram_parameters(self):
@@ -1102,6 +1132,15 @@ class ControlMenu(QDialog):
 
             ax0.set(xlim=[0, time[-1]])
             ax1.set(xlim=[0, time[-1]])
+
+            def format_time_amp(x, y):
+                return f"time = {x:.2f} s, amplitude = {y:.3f}"
+            def format_time_freq(x, y):
+                return f"time = {x:.2f} s, freq = {y:.1f} Hz"
+
+            ax0.format_coord = format_time_amp   # time-domain waveform
+            ax1.format_coord = format_time_freq  # spectrogram
+
 
             # Store both axes in the plot dialog by passing them as a tuple
             plot_dialog = self.show_plot_window(fig, ax0, audio)
@@ -1533,6 +1572,21 @@ class ControlMenu(QDialog):
             ax2 = plt.subplot(gs[1, 0])
             ax3 = plt.subplot(gs[2, 0], sharex=ax1)
             cbar_ax = plt.subplot(gs[:, 1])
+
+            # Custom coordinate display
+            def format_time_amp(x, y):
+                return f"time = {x:.2f} s, amplitude = {y:.3f}"
+
+            def format_freq_db(x, y):
+                return f"freq = {x:.1f} Hz, magnitude = {y:.1f} dB"
+
+            def format_time_freq(x, y):
+                return f"time = {x:.2f} s, freq = {y:.1f} Hz"
+
+            ax1.format_coord = format_time_amp   # time-domain waveform
+            ax2.format_coord = format_freq_db    # FFT window
+            ax3.format_coord = format_time_freq  # spectrogram
+
             
             self.current_figure.suptitle('STFT + Spectrogram', y=0.98)
 
@@ -1768,6 +1822,15 @@ class ControlMenu(QDialog):
         ax[1].plot(time_points, ste)
         ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Energy (dB)')
         
+
+        # Custom coordinate display
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+        ax[0].format_coord = format_time_amp   # time-domain waveform
+        def format_time_energy(x, y):
+            return f"time = {x:.2f} s, energy = {y:.3f} dB"
+        ax[1].format_coord = format_time_energy
+
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
     # Spectral Centroid
@@ -1902,6 +1965,20 @@ class ControlMenu(QDialog):
         ax3.set_ylabel("Freq (Hz)")
         ax3.set_xlabel("Time (s)")
 
+        # Custom coordinate display
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+
+        def format_freq_db(x, y):
+            return f"freq = {x:.1f} Hz, magnitude = {y:.1f} dB"
+
+        def format_time_freq(x, y):
+            return f"time = {x:.2f} s, freq = {y:.1f} Hz"
+
+        ax1.format_coord = format_time_amp   # time-domain waveform
+        ax2.format_coord = format_freq_db    # FFT window
+        ax3.format_coord = format_time_freq  # spectrograms
+
         # Colorbar
         self.current_figure.colorbar(img, cax=cax, format="%+2.0f dB")
         plt.tight_layout(rect=[0, 0, 0.97, 0.95])
@@ -2014,7 +2091,14 @@ class ControlMenu(QDialog):
         shared_dialog.original_ax = ax[0]
         shared_dialog.filtered_ax = ax[1]
 
-        # Create two separate span selectors, store them under the same dialog.plot_id
+        # Custom coordinate display
+        def format_time_amp(x, y):
+            return f"time = {x:.2f} s, amplitude = {y:.3f}"
+        ax[0].format_coord = format_time_amp   # time-domain waveform
+        ax[1].format_coord = format_time_amp   # time-domain waveform
+        
+
+            # Create two separate span selectors, store them under the same dialog.plot_id
         self.create_span_selector(ax[0], self.audio, shared_dialog, tag='original')
         self.create_span_selector(ax[1], filtered_signal, shared_dialog, tag='filtered')
 
@@ -2094,6 +2178,11 @@ class ControlMenu(QDialog):
             # Tag each axis to distinguish selectors
             shared_dialog.original_ax = ax0
             shared_dialog.filtered_ax = ax1
+
+            def format_time_freq(x, y):
+                return f"time = {x:.2f} s, freq = {y:.1f} Hz"
+            ax0.format_coord = format_time_freq  # spectrogram
+            ax1.format_coord = format_time_freq  # spectrogram
 
             # Independent span selectors on both plots with tags
             self.create_span_selector(ax0, self.audio, shared_dialog, tag='original')
