@@ -1,7 +1,7 @@
 
 #douleyei me ta ola prin to start/pause.
 
-from PyQt5.QtWidgets import (QWidget, QDoubleSpinBox, QSpinBox, QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
+from PyQt5.QtWidgets import (QFileDialog, QWidget, QDoubleSpinBox, QSpinBox, QMessageBox, QSlider, QHBoxLayout, QDialog, QLabel, QPushButton, QLineEdit, QRadioButton, 
                             QCheckBox, QComboBox, QGridLayout, QMessageBox, QGroupBox)
 from PyQt5.QtCore import Qt, QTimer
 import matplotlib.pyplot as plt
@@ -25,6 +25,12 @@ import matplotlib.gridspec as gridspec
 import matplotlib.gridspec as gridspec
 from matplotlib.widgets import SpanSelector
 from matplotlib import patches
+
+
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+import os
 
 
 class ControlMenu(QDialog):
@@ -100,7 +106,7 @@ class ControlMenu(QDialog):
         self.help_button.clicked.connect(self.show_help)
         main_layout.addWidget(self.help_button, 14, 2, 1, 1, Qt.AlignRight)
 
-        # Font size controls - NEW POSITION
+        # Font size controls
         font_layout = QHBoxLayout()
         font_label = QLabel("Font Size(in plots):")
         self.font_spin = QSpinBox()
@@ -109,6 +115,11 @@ class ControlMenu(QDialog):
         self.font_spin.valueChanged.connect(self.update_font_setting)
         font_layout.addWidget(font_label)
         font_layout.addWidget(self.font_spin)
+
+        # Add save button next to plot button
+        self.save_button = QPushButton('Save to Excel')
+        self.save_button.clicked.connect(self.save_to_excel)
+        main_layout.addWidget(self.save_button, 14, 0, 1, 1)
         
         # Add font controls to the right of help button
         font_container = QWidget()
@@ -302,6 +313,43 @@ class ControlMenu(QDialog):
         group.setLayout(grid)
         layout.addWidget(group, 1, 0, 8, 2)
 
+
+    def save_to_excel(self):
+        from PyQt5.QtWidgets import QFileDialog
+        import pandas as pd
+
+        # Open save dialog
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Audio Data to Excel",
+            f"{self.base_name}.xlsx",
+            "Excel Files (*.xlsx)",
+            options=options
+        )
+        if not file_path:
+            return  # User cancelled
+
+        print("len(self.time) =", len(self.time))
+        print("len(self.audio) =", len(self.audio))
+
+        # Ensure equal length
+        min_len = min(len(self.time), len(self.audio))
+        t = self.time[:min_len]
+        y = self.audio[:min_len]
+
+        # Build DataFrame
+        df = pd.DataFrame({
+            "Time (s)": t,
+            "Amplitude": y
+        })
+
+        # Save as CSV instead of Excel
+        csv_path = file_path.replace(".xlsx", ".csv")
+        df.to_csv(csv_path, index=False)
+
+        print(f"Saved {len(df)} rows to {csv_path}")
+
     # Audio helpers.
     def start_live_analysis(self):
         """Start live analysis for STFT windows"""
@@ -484,16 +532,12 @@ class ControlMenu(QDialog):
         self.min_pitch = QLineEdit("75.0")
         self.max_pitch = QLineEdit("600.0")
         
-        self.adv_settings = QPushButton("Advanced Settings")
-        self.adv_settings.clicked.connect(self.controller.adse.advancedSettings)
-       
         grid.addWidget(QLabel("Method:"), 0, 0)
         grid.addWidget(self.pitch_method, 0, 1)
         grid.addWidget(QLabel("Min pitch (Hz):"), 1, 0)
         grid.addWidget(self.min_pitch, 1, 1)
         grid.addWidget(QLabel("Max pitch (Hz):"), 2, 0)
         grid.addWidget(self.max_pitch, 2, 1)
-        grid.addWidget(self.adv_settings, 3, 0, 1, 2)
         
         group.setLayout(grid)
         layout.addWidget(group, 9, 0, 5, 2)
@@ -503,23 +547,7 @@ class ControlMenu(QDialog):
         self.pitch_method.setEnabled(enabled)
         self.min_pitch.setEnabled(enabled)
         self.max_pitch.setEnabled(enabled)
-        self.adv_settings.setEnabled(enabled)
 
-    def show_advanced_settings(self):
-        dialog = AdvancedSettings(self)
-        if dialog.exec_() == QDialog.Accepted:
-            autocorr_vars = dialog.getAutocorrelationVars()
-            subharmonic_vars = dialog.getSubharmonicsVars()
-            spinet_vars = dialog.getSpinetVars()
-            other_vars = dialog.getVariables()
-
-            self.controller.adse = {
-                'autocorr': autocorr_vars,
-                'subharmonics': subharmonic_vars,
-                'spinet': spinet_vars,
-                'other': other_vars
-            }
-            
     def create_filter_group(self, layout):
         group = QGroupBox("Filtering")
         grid = QGridLayout()
@@ -593,7 +621,16 @@ class ControlMenu(QDialog):
         
         group.setLayout(grid)
         layout.addWidget(group, 9, 2, 5, 2)
-        
+
+        self.window_type.currentTextChanged.connect(self.update_beta_state)
+    
+    def update_beta_state(self):
+        """Update beta field enabled state based on window selection"""
+        if self.window_type.currentText() == 'Kaiser':
+            self.beta.setEnabled(True)
+        else:
+            self.beta.setEnabled(False)
+
     def update_ui_state(self, method):
         # First define all the mode flags
 
@@ -643,7 +680,6 @@ class ControlMenu(QDialog):
         self.pitch_method.setEnabled(pitch_controls_enabled)
         self.min_pitch.setEnabled(pitch_controls_enabled)
         self.max_pitch.setEnabled(pitch_controls_enabled)
-        self.adv_settings.setEnabled(pitch_controls_enabled)
         
         # Filter controls
         self.filter_type.setEnabled(filtering_enabled)
@@ -707,7 +743,6 @@ class ControlMenu(QDialog):
                 plt.close(self.current_figure)
 
     # WAVEFORM
-
     def plot_waveform(self):
         # Get current font size (default to 12 if not set)
         fontsize = getattr(self, 'current_font_size', 12)
@@ -731,7 +766,6 @@ class ControlMenu(QDialog):
 
         self.show_plot_window(self.current_figure, ax, self.audio)
         
-
     # FT
     def plot_ft(self):
         # Get current font size (default to 12 if not set)
@@ -778,7 +812,6 @@ class ControlMenu(QDialog):
         self.show_plot_window(self.current_figure, ax[0], self.audio)
 
     # STFT
-
     def plot_stft(self):
         """STFT with proper array dimension handling"""
         try:
@@ -900,7 +933,6 @@ class ControlMenu(QDialog):
         ax[1].format_coord = format_freq_db    # FFT window
 
         self.current_figure.canvas.draw()
-
 
     # Pitch
     def calculate_pitch(self, signal=None):
@@ -1316,7 +1348,7 @@ class ControlMenu(QDialog):
         """Create a specialized dialog for STFT plots with live analysis button only"""
         try:
             start, end = 0, self.duration
-            plot_title = f"{"STFT&Spectro"}_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
+            plot_title = f"STFT&Spectro_{self.base_name}_{self.format_timestamp(start)}-{self.format_timestamp(end)}"
 
             plot_dialog = QDialog(self)
             plot_dialog.setWindowTitle(plot_title)
@@ -1673,7 +1705,6 @@ class ControlMenu(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"STFT+Spectrogram plot failed: {str(e)}")
 
-
     def on_window_click_spect(self, event, ax1, ax2, ax3):
         """Move analysis window on left click (without dragging)"""
         if event.inaxes != ax1 or event.button != 1 or event.dblclick:
@@ -1763,27 +1794,32 @@ class ControlMenu(QDialog):
         self.img.set_clim(self.global_stft_min, self.global_stft_max)
                 
         self.current_figure.canvas.draw()
-                
-
 
     # Short Time Energy
-
+    
     def plot_ste(self):
         # Get current font size (default to 12 if not set)
         fontsize = getattr(self, 'current_font_size', 12)
         
+        self.update_beta_state()
+
         # Set style before creating figure
         plt.style.use('default')
         plt.rcParams.update({'font.size': fontsize})
 
-
+        show_pitch = self.show_pitch.isChecked()
         wind_size = float(self.window_size.text())
         overlap = float(self.overlap.text())
         window_type = self.window_type.currentText()
         beta = float(self.beta.text()) if window_type == 'Kaiser' else 0
+
+        # Get parameters from UI
+        min_pitch = float(self.min_pitch.text())
+        max_pitch = float(self.max_pitch.text())
         
         self.current_figure, ax = plt.subplots(2, figsize=(12,6), sharex=True)
-        self.current_figure.suptitle('Short-Time Energy')
+        title = 'Short-Time Energy with Pitch' if show_pitch else 'Short-Time Energy'
+        self.current_figure.suptitle(title)
         
         # Hide x labels and tick labels for all but bottom plot
         for a in ax:
@@ -1803,35 +1839,94 @@ class ControlMenu(QDialog):
             window = np.hanning(wind_size_samples)
         elif window_type == 'Kaiser':
             window = np.kaiser(wind_size_samples, beta)
+
+        if window_type == 'Kaiser':
+            try:
+                beta = float(self.beta.text())
+                if beta < 0 or beta > 50:
+                    beta = 14.0
+                    self.beta.setText("14.0")
+            except ValueError:
+                beta = 14.0
+                self.beta.setText("14.0")
+        else:
+            beta = 0
         
         # Calculate STE with proper hop size and dB conversion
         ste = []
         time_points = []
         for i in range(0, len(self.audio) - wind_size_samples, hop_size):
             segment = self.audio[i:i+wind_size_samples] * window
-            #energy = 10 * np.log10(np.mean(segment**2))  # Convert to dB
-            energy = 10 * np.log10(np.mean(segment**2) + 1e-12)  # avoid -inf
+            energy = 10 * np.log10(np.mean(segment**2) + 1e-12)
             ste.append(energy)
-            time_points.append(self.time[i + wind_size_samples//2])  # Center time point
+            time_points.append(self.time[i + wind_size_samples//2])
         
         # Plot original waveform
         ax[0].plot(self.time, self.audio)
-        ax[0].set(ylabel='Amplitude (dB)')
+        ax[0].set(ylabel='Amplitude')
         
         # Plot STE in dB
-        ax[1].plot(time_points, ste)
-        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Energy (dB)')
-        
+        ste_line = ax[1].plot(time_points, ste, color='blue', linewidth=1.5, label='STE')[0]
+        ax[1].set(xlim=[0, self.duration], xlabel='Time (s)', ylabel='Short-Time Energy (dB)')
 
-        # Custom coordinate display
+
+        # Add pitch tracking if enabled
+        if show_pitch:
+            try:
+                # Calculate pitch
+                pitch, pitch_values = self.calculate_pitch()
+                pitch_times = librosa.times_like(pitch_values, sr=self.fs, hop_length=hop_size)
+                
+                # Debug: Print pitch values to see what we're getting
+                print(f"Pitch values range: {np.min(pitch_values):.1f} to {np.max(pitch_values):.1f} Hz")
+                print(f"Pitch times range: {np.min(pitch_times):.2f} to {np.max(pitch_times):.2f} s")
+                print(f"Number of pitch points: {len(pitch_values)}")
+                
+                # Create twin axis for pitch
+                ax_pitch = ax[1].twinx()
+                pitch_line = ax_pitch.plot(pitch_times, pitch_values, color='red', linewidth=1.5, 
+                                         alpha=0.9, label='Pitch')[0]
+                ax_pitch.set_ylabel('Pitch (Hz)', color='red')
+                ax_pitch.tick_params(axis='y', labelcolor='red')
+                
+                # Set pitch axis limits based on actual data (with padding)
+                pitch_nonzero = pitch_values[pitch_values > 0]  # Filter out zeros/unvoiced
+                if len(pitch_nonzero) > 0:
+                    pitch_min = max(min_pitch, np.min(pitch_nonzero) * 0.8)  # Minimum 50 Hz
+                    pitch_max = min(max_pitch, np.max(pitch_nonzero) * 1.2)  # Maximum 500 Hz
+                    ax_pitch.set_ylim([pitch_min, pitch_max])
+                else:
+                    ax_pitch.set_ylim([50, 300])  # Default range if no pitch detected
+                
+                # Add legend
+                lines = [ste_line, pitch_line]
+                labels = [l.get_label() for l in lines]
+                ax[1].legend(lines, labels, loc='upper right')
+                
+                # Enhanced coordinate display
+                def format_time_energy_pitch(x, y):
+                    idx = np.argmin(np.abs(np.array(pitch_times) - x))
+                    pitch_val = pitch_values[idx] if idx < len(pitch_values) else 0
+                    return f"time = {x:.2f} s, energy = {y:.3f} dB, pitch = {pitch_val:.1f} Hz"
+                ax[1].format_coord = format_time_energy_pitch
+                
+            except Exception as e:
+                print(f"Pitch plotting error: {e}")
+                # Fallback to regular STE display
+                def format_time_energy(x, y):
+                    return f"time = {x:.2f} s, energy = {y:.3f} dB"
+                ax[1].format_coord = format_time_energy
+        else:
+            def format_time_energy(x, y):
+                return f"time = {x:.2f} s, energy = {y:.3f} dB"
+            ax[1].format_coord = format_time_energy
+
         def format_time_amp(x, y):
             return f"time = {x:.2f} s, amplitude = {y:.3f}"
-        ax[0].format_coord = format_time_amp   # time-domain waveform
-        def format_time_energy(x, y):
-            return f"time = {x:.2f} s, energy = {y:.3f} dB"
-        ax[1].format_coord = format_time_energy
+        ax[0].format_coord = format_time_amp
 
         self.show_plot_window(self.current_figure, ax[0], self.audio)
+
 
     # Spectral Centroid
 
