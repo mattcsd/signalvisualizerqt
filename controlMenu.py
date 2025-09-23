@@ -133,81 +133,6 @@ class ControlMenu(QDialog):
         """Update the global font setting"""
         self.current_font_size = size
 
-    def play_from_current_position(self):
-        """Stream audio from the current position using a low-latency callback."""
-
-        self.stop_audio()
-
-        self.mid_point_idx = 0
-        self.playback_start_sample = 0
-
-        # Use full audio
-        audio_chunk = self.audio
-
-        if len(audio_chunk) == 0:
-            print("Empty audio_chunk — skipping playback")
-            return
-
-        if np.max(np.abs(audio_chunk)) > 1.0:
-            audio_chunk = audio_chunk / np.max(np.abs(audio_chunk))
-
-        if audio_chunk.ndim > 1:
-            print(f"Converting multichannel audio with shape {audio_chunk.shape} to mono.")
-            audio_chunk = np.mean(audio_chunk, axis=1)
-
-        if not np.any(audio_chunk):
-            print("Audio chunk is silent or empty!")
-            return
-
-        print(f"Audio length: {len(audio_chunk)}, sample rate: {self.fs}")
-
-        self.stream_pos = 0
-        self.stream_data = audio_chunk.astype(np.float32)
-        total_length = len(self.stream_data)
-
-    def callback(outdata, frames, time, status):
-        if status:
-            print("Stream status:", status)
-
-        remaining = total_length - self.stream_pos
-        if remaining <= 0:
-            raise sd.CallbackStop()
-
-        n_frames = min(frames, remaining)
-        chunk = self.stream_data[self.stream_pos:self.stream_pos + n_frames]
-
-        if n_frames < frames:
-            chunk = np.pad(chunk, (0, frames - n_frames))
-
-        outdata[:, 0] = chunk
-        self.stream_pos += n_frames
-        self.mid_point_idx = self.stream_pos  # <-- live cursor index for update_playback_position()
-
-        if self.stream_pos >= total_length:
-            raise sd.CallbackStop()
-
-        try:
-            self.active_stream = sd.OutputStream(
-                samplerate=self.fs,
-                channels=1,
-                dtype='float32',
-                callback=callback,
-                blocksize=4096,
-            )
-            self.active_stream.start()
-            self.is_playing = True
-            self.playback_start_time = time.time()
-            self.playback_start_sample = self.stream_pos
-
-            # Start visualization timer
-            if not hasattr(self, 'playback_timer'):
-                self.playback_timer = QTimer()
-                self.playback_timer.timeout.connect(self.update_playback_position)
-            self.playback_timer.start(5)
-
-        except Exception as e:
-            print(f"Audio playback failed: {e}")
-
     def show_help(self):
         """Properly shows and activates the help window"""
         if hasattr(self.controller, 'help'):
@@ -313,7 +238,6 @@ class ControlMenu(QDialog):
         group.setLayout(grid)
         layout.addWidget(group, 1, 0, 8, 2)
 
-
     def save_to_excel(self):
         from PyQt5.QtWidgets import QFileDialog
         import pandas as pd
@@ -351,36 +275,6 @@ class ControlMenu(QDialog):
         print(f"Saved {len(df)} rows to {csv_path}")
 
     # Audio helpers.
-    def start_live_analysis(self):
-        """Start live analysis for STFT windows"""
-        # Get the button that triggered this
-        sender = self.sender()
-        self.live_analysis_btn = sender
-
-        # Find the parent plot dialog
-        parent = sender.parent()
-        while parent and not isinstance(parent, QDialog):
-            parent = parent.parent()
-        
-        if not parent:
-            print("Couldn't find STFT plot window")
-            return
-        
-        # Store reference to current window
-        self.current_live_window = parent
-        
-        # Initialize analysis
-        if not hasattr(self, 'live_timer'):
-            self.live_timer = QTimer()
-            self.live_timer.timeout.connect(self.update_live_position)
-        
-        # Start audio playback
-        print("STARTED PLAYING")
-        self.play_from_current_position()
-        
-        # Start timer
-        self.live_timer.start(100)
-
     def update_playback_position(self):
         # Use QMediaPlayer's position directly instead of time.time()
         if not hasattr(self, 'media_player') or not self.media_player:

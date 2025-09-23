@@ -412,8 +412,6 @@ class Start(QMainWindow):
 
     def cleanup_tuner(self):
 
-        #   ADD THIS WHEN CLOSING THE TUNER AND CHANGING TO ANOTHER PAGE.
-
         """Clean up tuner resources"""
         if hasattr(self, 'tuner_window'):
             try:
